@@ -11,6 +11,7 @@ import {
   deleteRepository,
   getRepositoriesForCurrUser,
   getRepoCommits,
+  getRepoFile,
 } from "../controllers/repoControllers.js";
 
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -43,5 +44,6 @@ repoRouter.delete(
   authorizeRepoOwner,
   deleteRepository,
 );
+repoRouter.get("/:repoId/file", authMiddleware, getRepoFile);
 repoRouter.get("/:repoId/commits", authMiddleware, getRepoCommits);
 export default repoRouter;

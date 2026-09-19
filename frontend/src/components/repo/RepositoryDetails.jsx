@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Navbar from "../navbar/Navbar";
+import CommitHistory from "./CommitHistory";
+import RepoFiles from "./RepoFiles";
+import RepoReadme from "./RepoReadme";
 import {
   Box,
   Typography,
@@ -15,7 +18,6 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import CallSplitIcon from "@mui/icons-material/CallSplit";
-import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 
 export default function RepositoryDetails() {
   const { repoId, id } = useParams();
@@ -282,74 +284,13 @@ export default function RepositoryDetails() {
                 {deleting ? "Deleting..." : "Delete Repo"}
               </Button>
             </Box>
-
-            {/* Commit / Files Box */}
-            <Paper
-              elevation={0}
-              sx={{
-                backgroundColor: "#0d1117",
-                border: "1px solid #30363d",
-                borderRadius: "6px",
-                mb: 3,
-                overflow: "hidden",
-              }}
-            >
-              <Box
-                sx={{
-                  p: 2,
-                  backgroundColor: "#161b22",
-                  borderBottom: "1px solid #30363d",
-                  fontSize: "13px",
-                  color: "#8b949e",
-                }}
-              >
-                Latest commit status:{" "}
-                <span style={{ color: "#f0f6fc", fontWeight: 600 }}>
-                  Initial commit
-                </span>
-              </Box>
-              <Box
-                sx={{
-                  p: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  fontSize: "14px",
-                }}
-              >
-                <InsertDriveFileIcon sx={{ fontSize: 18, color: "#8b949e" }} />
-                <Typography sx={{ fontSize: "14px" }}>README.md</Typography>
-              </Box>
-            </Paper>
-
-            {/* Readme Card */}
-            <Paper
-              elevation={0}
-              sx={{
-                backgroundColor: "#0d1117",
-                border: "1px solid #30363d",
-                borderRadius: "6px",
-              }}
-            >
-              <Box
-                sx={{
-                  p: 2,
-                  borderBottom: "1px solid #30363d",
-                  fontWeight: 600,
-                  fontSize: "14px",
-                }}
-              >
-                README.md
-              </Box>
-              <Box sx={{ p: 4 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
-                  {repo?.name}
-                </Typography>
-                <Typography sx={{ color: "#8b949e" }}>
-                  {repo?.description || "No description provided."}
-                </Typography>
-              </Box>
-            </Paper>
+            <RepoFiles repoId={activeId} />
+            <CommitHistory repoId={activeId} />
+            <RepoReadme
+              repoId={activeId}
+              name={repo?.name}
+              description={repo?.description}
+            />
           </Box>
 
           {/* Sidebar */}

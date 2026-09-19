@@ -20,6 +20,9 @@ export const pullChanges = async () => {
   const commitsPath = path.join(repoPath, "commits");
 
   try {
+    await fs.promises.mkdir(commitsPath, { recursive: true });
+    const localDirs = new Set(await fs.promises.readdir(commitsPath));
+
     const response = await axios.get(
       `http://localhost:3000/repositories/${repoId}/commits`,
       { headers: { Authorization: `Bearer ${token}` } },
@@ -30,11 +33,14 @@ export const pullChanges = async () => {
     for (const commit of commits) {
       const localCommitDir = path.join(commitsPath, commit._id);
 
-      // Skip commits we've already pulled — a commit.json already existing
-      // locally means this one was fetched before.
-      if (fs.existsSync(path.join(localCommitDir, "commit.json"))) {
-        continue;
-      }
+      // Skip commits we already have:
+      //  - pulled before (commit.json exists in a folder named by its _id), or
+      //  - made locally and pushed (its local folder name is embedded in the
+      //    file keys: "repoId/<localCommitDir>/file").
+      const alreadyHave =
+        fs.existsSync(path.join(localCommitDir, "commit.json")) ||
+        (commit.files || []).some((key) => localDirs.has(key.split("/")[1]));
+      if (alreadyHave) continue;
 
       await fs.promises.mkdir(localCommitDir, { recursive: true });
 
@@ -51,12 +57,15 @@ export const pullChanges = async () => {
         console.log(`Pulled ${fileName} (commit ${commit._id})`);
       }
 
-      // Keep local commit.json format consistent with what `commit.js` writes
+      // Written last, so a failed download is retried on the next pull.
+      // `pushed: true` because this commit came from the server, and `push`
+      // must never send it back.
       await fs.promises.writeFile(
         path.join(localCommitDir, "commit.json"),
         JSON.stringify({
           message: commit.message,
           timestamp: commit.createdAt,
+          pushed: true,
         }),
       );
     }

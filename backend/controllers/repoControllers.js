@@ -1,17 +1,20 @@
 import Repository from "../models/repoModel.js";
 import User from "../models/userModel.js";
-import mongoose from "mongoose";
 import Issue from "../models/issueModel.js";
 import Commit from "../models/commitModel.js";
+import { s3, S3_BUCKET } from "../config/aws-config.js";
 
 export const createRepository = async (req, res) => {
-  const { owner, name, issues, content, description, visibility } = req.body;
+  // `owner` comes from the verified JWT (req.user), never from the request body,
+  // so nobody can create a repository under someone else's account.
+  const { name, issues, content, description, visibility } = req.body;
   try {
+    const owner = req.user?._id;
+    if (!owner) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
     if (!name) {
       return res.status(400).json({ message: "Repository name is needed" });
-    }
-    if (!mongoose.Types.ObjectId.isValid(owner)) {
-      return res.status(400).json({ message: "Invalid user" });
     }
     const newRepo = new Repository({
       name,
@@ -39,7 +42,7 @@ export const createRepository = async (req, res) => {
 export const getAllRepositories = async (req, res) => {
   try {
     const repositories = await Repository.find({})
-      .populate("owner")
+      .populate("owner", "-password")
       .populate("issues");
     res.status(200).json({ repositories });
   } catch (error) {
@@ -52,7 +55,7 @@ export const getRepositoryById = async (req, res) => {
 
   try {
     const result = await Repository.findById(repoId)
-      .populate("owner")
+      .populate("owner", "-password")
       .populate("issues");
     if (!result) {
       return res.status(404).json({ message: "Repository not found" });
@@ -68,7 +71,7 @@ export const getRepositoryByName = async (req, res) => {
 
   try {
     const result = await Repository.find({ name: repoName })
-      .populate("owner")
+      .populate("owner", "-password")
       .populate("issues");
     if (result.length === 0) {
       return res.status(404).json({
@@ -85,7 +88,7 @@ export const getRepositoryByOwner = async (req, res) => {
   const { repoOwner } = req.params;
   try {
     const repositories = await Repository.find({ owner: repoOwner })
-      .populate("owner")
+      .populate("owner", "-password")
       .populate("issues");
 
     if (repositories.length === 0) {
@@ -214,5 +217,46 @@ export const getRepoCommits = async (req, res) => {
     res.status(200).json({ commits });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+// GET /repositories/:repoId/file?key=<repoId>/<commitId>/<name>
+export const getRepoFile = async (req, res) => {
+  const { repoId } = req.params;
+  const { key } = req.query;
+
+  // The key must belong to this repo...
+  if (
+    typeof key !== "string" ||
+    !key.startsWith(`${repoId}/`) ||
+    key.split("/").includes("..")
+  ) {
+    return res.status(400).json({ message: "Invalid file key" });
+  }
+
+  try {
+    // ...and must be a file that one of this repo's commits actually registered.
+    const registered = await Commit.exists({ repository: repoId, files: key });
+    if (!registered) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    // Always sent as a download so a browser never renders or runs an
+    // uploaded HTML/JS file from your API's origin.
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Disposition", "attachment");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+
+    const stream = s3
+      .getObject({ Bucket: S3_BUCKET, Key: key })
+      .createReadStream();
+    stream.on("error", (err) => {
+      if (res.headersSent) return res.end();
+      res
+        .status(err.statusCode === 404 ? 404 : 500)
+        .json({ message: "Could not read file from storage" });
+    });
+    stream.pipe(res);
+  } catch (error) {
+    if (!res.headersSent) res.status(500).json({ message: error.message });
   }
 };
