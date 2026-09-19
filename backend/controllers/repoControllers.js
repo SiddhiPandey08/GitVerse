@@ -2,7 +2,6 @@ import Repository from "../models/repoModel.js";
 import User from "../models/userModel.js";
 import mongoose from "mongoose";
 import Issue from "../models/issueModel.js";
-import dotenv from "dotenv";
 import Commit from "../models/commitModel.js";
 
 export const createRepository = async (req, res) => {
@@ -119,7 +118,8 @@ export const getRepositoriesForCurrUser = async (req, res) => {
 
 export const updateRepository = async (req, res) => {
   const { repoId } = req.params;
-  const { description, content, message, author } = req.body;
+  const { description, content, message, files } = req.body;
+  const author = req.user._id;
   try {
     if (!message) {
       return res.status(400).json({ message: "Commit message is required" });
@@ -138,6 +138,7 @@ export const updateRepository = async (req, res) => {
       author,
       message,
       repository: repoId,
+      files: files || [],
     });
 
     res.status(200).json(updatedRepo);
@@ -195,6 +196,22 @@ export const deleteRepository = async (req, res) => {
       return res.status(404).json({ message: "Repository not found" });
     }
     res.json({ message: "Repository deleted" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Add this to repoControllers.js (or a new commitControllers.js if you'd
+// rather keep commit-related logic separate from repo CRUD — your call).
+
+export const getRepoCommits = async (req, res) => {
+  const { repoId } = req.params;
+  try {
+    const commits = await Commit.find({ repository: repoId })
+      .sort({ createdAt: 1 }) // oldest first, matching commit order
+      .populate("author", "username");
+
+    res.status(200).json({ commits });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

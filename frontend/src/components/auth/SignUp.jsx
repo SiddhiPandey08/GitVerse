@@ -127,6 +127,8 @@ export default function SignUp(props) {
       console.log(res.data);
 
       localStorage.setItem("token", res.data.token);
+      axios.defaults.headers.common["Authorization"] =
+        `Bearer ${res.data.token}`;
       localStorage.setItem("userId", res.data.userId);
       setCurrUser(res.data.userId);
 

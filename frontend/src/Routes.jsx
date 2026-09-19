@@ -36,7 +36,7 @@ const ProjectRoutes = () => {
       element: currUser ? <Navigate to="/" replace /> : <SignUp />,
     },
     {
-      path: "/createRepo",
+      path: "/create-new-repo",
       element: currUser ? (
         <CreateRepository />
       ) : (

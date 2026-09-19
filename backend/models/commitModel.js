@@ -17,6 +17,10 @@ const commitSchema = new mongoose.Schema(
       ref: "Repository",
       required: true,
     },
+    files: {
+      type: [String], // MinIO/S3 object keys for this commit's files
+      default: [],
+    },
   },
   { timestamps: true },
 );

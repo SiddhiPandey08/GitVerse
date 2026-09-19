@@ -2,9 +2,6 @@ import User from "../models/userModel.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { MongoClient, ObjectId } from "mongodb";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);

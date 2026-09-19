@@ -14,12 +14,24 @@ import bodyParser from "body-parser";
 import http from "http";
 import { Server } from "socket.io";
 import mainRouter from "./routes/main.router.js";
+import { loginCli } from "./controllers/login.js";
 
 dotenv.config();
 
 yargs(hideBin(process.argv))
   .command("launch", "Launching the server", {}, initializeServer)
-  .command("init", "Initialize the application", {}, initRepo)
+  .command(
+    "init <repoId>",
+    "Initialize the application and link it to an existing repository",
+    (yargs) => {
+      yargs.positional("repoId", {
+        describe:
+          "The MongoDB ID of an existing repository (create it via the web app first)",
+        type: "string",
+      });
+    },
+    (argv) => initRepo(argv.repoId),
+  )
   .command(
     "add <file>",
     "Add a file to the repository",
@@ -55,6 +67,8 @@ yargs(hideBin(process.argv))
     },
     (argv) => revertChanges(argv.commitHashID),
   )
+  .command("login", "Log in to GitVerse", {}, loginCli)
+
   .demandCommand(1, "You need to specify a command")
   .help().argv;
 
@@ -64,7 +78,6 @@ function initializeServer() {
   app.use(cors({ origin: "*" }));
   app.use(bodyParser.json());
   app.use(express.json());
-  const server = http.createServer(app);
 
   const mongoDbUri = process.env.MONGODB_URI;
   mongoose
