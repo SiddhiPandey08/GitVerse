@@ -11,12 +11,13 @@ import RepositoryDetails from "./components/repo/RepositoryDetails";
 import StarredRepos from "./components/repo/StarredRepos";
 import CreateRepository from "./components/repo/CreateRepository";
 import NotFound from "./components/common/NotFound";
-
+import Landing from "./components/landing/Landing";
 // Auth Context
 import { useAuth } from "./authContext";
 
 const ProjectRoutes = () => {
   const { currUser, loading } = useAuth();
+  const isLoggedIn = Boolean(localStorage.getItem("token")); // use the key authContext.jsx stores the JWT under
 
   if (loading) {
     return null;
@@ -25,7 +26,11 @@ const ProjectRoutes = () => {
   const routes = useRoutes([
     {
       path: "/",
-      element: currUser ? <Dashboard /> : <Navigate to="/auth" replace />,
+      element: isLoggedIn ? <Navigate to="/dashboard" replace /> : <Landing />,
+    },
+    {
+      path: "/dashboard",
+      element: <Dashboard />,
     },
     {
       path: "/auth",

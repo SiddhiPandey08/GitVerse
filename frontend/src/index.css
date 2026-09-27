@@ -1,105 +1,232 @@
 /* ==========================================================================
-   GitVerse — Production Polish
+   GitVerse global styles: pitch black, cream ink, Sharpie + General Sans
    ========================================================================== */
 
-@import url("https://api.fontshare.com/v2/css?f[]=sharpie@400,500,700&display=swap");
-@import url("https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap");
+@import url("https://api.fontshare.com/v2/css?f[]=sharpie@400,500,700&f[]=general-sans@400,500,600,700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap");
 
 :root {
-  /* Surface hierarchy */
-  --bg-app: #0d1117; /* Void background */
-  --bg-surface: #161b22; /* Section cards & containers */
-  --bg-surface-hover: #21262d; /* Interactive card/list hover */
-  --border-subtle: #30363d; /* GitHub border stroke */
+  /* Surfaces */
+  --black: #000;
+  --surface: #0d0d0d;
+  --raised: #161616;
+  --line: #2a2a2a;
 
-  /* Text & Accents */
-  --text-primary: #f0f6fc;
-  --text-secondary: #8b949e;
-  --link-blue: #4493f8; /* Authentic GitHub link color */
-  --accent-green: #238636; /* Primary button fill */
-  --accent-green-hover: #2ea043;
+  /* Text and accents (same values as theme.js and the landing page) */
+  --ink: #f4f1ea;
+  --muted: #a8a399;
+  --blue: #3341ff;
+  --blue-light: #8c96ff; /* use for link/text colour, --blue is too dark on black */
+  --mint: #3ddc97;
+  --pink: #ff7ab8;
+  --violet: #7c3aed;
+  --sh: var(--blue); /* hard-shadow colour, override per panel */
 
-  /* Font Tokens */
   --font-display: "Sharpie", sans-serif;
   --font-ui: "General Sans", -apple-system, sans-serif;
-  --font-code: "Fira Code", monospace;
+  --font-code: "Fira Code", ui-monospace, Menlo, monospace;
 
-  /* App.css mapping */
-  --border: var(--border-subtle);
-  --accent: var(--link-blue);
-  --text-h: var(--text-primary);
+  /* Legacy aliases so existing components keep working. Rename when convenient. */
+  --bg-app: var(--black);
+  --bg-surface: var(--surface);
+  --bg-surface-hover: var(--raised);
+  --border-subtle: var(--line);
+  --border: var(--line);
+  --text-primary: var(--ink);
+  --text-secondary: var(--muted);
+  --text-h: var(--ink);
+  --link-blue: var(--blue-light);
+  --accent: var(--blue-light);
+  --accent-green: var(--blue);
+  --accent-green-hover: #4b58ff;
+
+  color-scheme: dark;
 }
 
 * {
   box-sizing: border-box;
+  scrollbar-color: #3a3a3a var(--black);
 }
 
 body {
   margin: 0;
   font-family: var(--font-ui);
-  background-color: var(--bg-app);
-  color: var(--text-primary);
+  background-color: var(--black);
+  color: var(--ink);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Brand & Main Headings ONLY (Restricts Sharpie from leaking into links) */
+::selection {
+  background: var(--blue);
+  color: #fff;
+}
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Sharpie only on the brand and the two biggest headings */
 .logo,
 h1,
 h2 {
   font-family: var(--font-display);
   font-style: normal;
+  font-weight: 700;
 }
-
 h3,
 h4,
 h5,
 h6 {
   font-family: var(--font-ui);
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
-/* Clean, non-italicized UI Links */
-a {
-  font-family: var(--font-ui);
-  font-style: normal;
-  color: var(--link-blue);
+/* Zero-specificity so .gv (landing), MUI and component CSS always win */
+:where(a) {
+  color: var(--blue-light);
   text-decoration: none;
   font-weight: 500;
 }
-
-a:hover {
+:where(a):hover {
   text-decoration: underline;
 }
 
-/* GitHub "New Repo" Green Solid CTA */
-button,
+code,
+pre,
+kbd {
+  font-family: var(--font-code);
+}
+code {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.9em;
+}
+pre {
+  background: #0a0a0a;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  overflow: auto;
+}
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* Native (non-MUI) buttons and inputs. MUI components are excluded so they keep the theme's styling. */
+button:not([class*="Mui"]),
 .btn-primary,
 .new-repo-btn {
   font-family: var(--font-ui);
-  font-weight: 500;
-  background-color: var(--accent-green);
-  color: #ffffff;
-  border: 1px solid rgba(240, 246, 252, 0.1);
-  border-radius: 6px;
-  padding: 5px 12px;
+  font-weight: 600;
   font-size: 14px;
+  color: #fff;
+  background-color: var(--blue);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  padding: 6px 14px;
+  box-shadow: 3px 3px 0 var(--ink);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition:
+    transform 0.1s,
+    box-shadow 0.1s;
 }
-
-button:hover,
+button:not([class*="Mui"]):hover,
 .btn-primary:hover,
 .new-repo-btn:hover {
-  background-color: var(--accent-green-hover);
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+button:not([class*="Mui"]):disabled {
+  opacity: 0.5;
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
-/* Card Container Utility Class */
+input:not([class*="Mui"]),
+textarea:not([class*="Mui"]),
+select:not([class*="Mui"]) {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid rgba(244, 241, 234, 0.35);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+input:not([class*="Mui"]):focus,
+textarea:not([class*="Mui"]):focus,
+select:not([class*="Mui"]):focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--blue);
+}
+
+/* Panels: loud container for sections, flat rows inside them */
 .panel-card {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--sh);
   padding: 16px;
+}
+.sh-pink {
+  --sh: var(--pink);
+}
+.sh-mint {
+  --sh: var(--mint);
+}
+.sh-violet {
+  --sh: var(--violet);
+}
+
+.list-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.list-row:first-child {
+  border-top: 0;
+}
+.list-row:hover {
+  background: var(--raised);
+}
+
+/* Rendered README (react-markdown) */
+.markdown-body {
+  line-height: 1.65;
+}
+.markdown-body h1,
+.markdown-body h2 {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.markdown-body table {
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+}
+.markdown-body th {
+  background: var(--raised);
+}
+.markdown-body blockquote {
+  margin: 16px 0;
+  padding: 0 16px;
+  border-left: 4px solid var(--violet);
+  color: var(--muted);
+}
+.markdown-body img {
+  max-width: 100%;
+}
+.markdown-body input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--blue);
 }
