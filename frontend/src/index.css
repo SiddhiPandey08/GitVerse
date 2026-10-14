@@ -1,9 +1,10 @@
+@import url("https://api.fontshare.com/v2/css?f[]=sharpie@400,500,700&f[]=general-sans@400,500,600,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap");
+@import "tailwindcss";
+
 /* ==========================================================================
    GitVerse global styles: pitch black, cream ink, Sharpie + General Sans
    ========================================================================== */
-
-@import url("https://api.fontshare.com/v2/css?f[]=sharpie@400,500,700&f[]=general-sans@400,500,600,700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap");
 
 :root {
   /* Surfaces */
@@ -229,4 +230,31 @@ select:not([class*="Mui"]):focus {
 .markdown-body input[type="checkbox"] {
   margin-right: 6px;
   accent-color: var(--blue);
+}
+
+.landing-page {
+  overflow-x: hidden;
+  font-family: var(--font-ui);
+}
+
+.landing-page .sharpie-font {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.landing-page a:focus-visible,
+.landing-page button:focus-visible {
+  outline-color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .landing-page .neo-btn {
+    min-height: 42px;
+  }
+
+  .landing-page pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
 }

@@ -1,4 +1,3 @@
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Typography, Button } from "@mui/material";
 
@@ -34,7 +33,7 @@ export default function NotFound() {
       </Typography>
       <Button
         variant="contained"
-        onClick={() => navigate("/")}
+        onClick={() => navigate("/dashboard")}
         sx={{
           backgroundColor: "#238636",
           color: "white",
@@ -44,7 +43,7 @@ export default function NotFound() {
           "&:hover": { backgroundColor: "#2ea043" },
         }}
       >
-        Return to Dashboard
+        Go to Dashboard
       </Button>
     </Box>
   );

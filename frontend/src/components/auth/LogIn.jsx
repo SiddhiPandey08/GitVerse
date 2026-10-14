@@ -2,18 +2,18 @@ import * as React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CssBaseline from "@mui/material/CssBaseline";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import Divider from "@mui/material/Divider";
 import FormLabel from "@mui/material/FormLabel";
 import FormControl from "@mui/material/FormControl";
-import { Link } from "react-router-dom";
+import Alert from "@mui/material/Alert";
+import { Link, useNavigate } from "react-router-dom";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Stack from "@mui/material/Stack";
 import MuiCard from "@mui/material/Card";
 import { styled } from "@mui/material/styles";
 import { useAuth } from "../../authContext";
-import axios from "axios";
+import { login } from "../../api/users";
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: "flex",
@@ -57,18 +57,12 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
   },
 }));
 
-export default function SignIn(props) {
+export default function SignIn() {
+  const navigate = useNavigate();
   const [emailError, setEmailError] = React.useState(false);
   const [emailErrorMessage, setEmailErrorMessage] = React.useState("");
   const [passwordError, setPasswordError] = React.useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = React.useState("");
-
-  const handleSubmit = (e) => {
-    if (emailError || passwordError) {
-      e.preventDefault();
-      return;
-    }
-  };
 
   const validateInputs = () => {
     const email = document.getElementById("email");
@@ -76,16 +70,18 @@ export default function SignIn(props) {
 
     let isValid = true;
 
-    if (!email.value) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
       setEmailError(true);
+      setEmailErrorMessage("Enter a valid email address.");
       isValid = false;
     } else {
       setEmailError(false);
       setEmailErrorMessage("");
     }
 
-    if (!password.value) {
+    if (password.value.length < 8) {
       setPasswordError(true);
+      setPasswordErrorMessage("Password must be at least 8 characters.");
       isValid = false;
     } else {
       setPasswordError(false);
@@ -98,37 +94,36 @@ export default function SignIn(props) {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
-  const { currUser, setCurrUser } = useAuth();
+  const [submitError, setSubmitError] = React.useState("");
+  const { setCurrUser } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:3000/users/login", {
+      const res = await login({
         email: email,
         password: password,
       });
       localStorage.setItem("token", res.data.token);
-      axios.defaults.headers.common["Authorization"] =
-        `Bearer ${res.data.token}`;
       localStorage.setItem("userId", res.data.userId);
 
-      setCurrUser(res.data.userId);
+      setCurrUser({ _id: res.data.userId, id: res.data.userId });
 
       setLoading(false);
-      window.location.href = "/";
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error(error);
-      alert("Login failed");
+      setSubmitError(
+        error.response?.data?.message || "Login failed. Check your credentials.",
+      );
       setLoading(false);
     }
   };
   const onSubmit = (e) => {
+    e.preventDefault();
     const isValid = validateInputs();
-
-    if (isValid) {
-      handleLogin(e);
-    }
+    if (isValid) handleLogin(e);
   };
 
   return (
@@ -152,7 +147,7 @@ export default function SignIn(props) {
           </Typography>
           <Box
             component="form"
-            onSubmit={handleSubmit}
+            onSubmit={onSubmit}
             noValidate
             sx={{
               display: "flex",
@@ -161,6 +156,7 @@ export default function SignIn(props) {
               gap: 2,
             }}
           >
+            {submitError && <Alert severity="error">{submitError}</Alert>}
             <FormControl>
               <FormLabel htmlFor="email">Email</FormLabel>
               <TextField
@@ -204,8 +200,8 @@ export default function SignIn(props) {
             <Button
               fullWidth
               variant="contained"
+              type="submit"
               disabled={loading}
-              onClick={onSubmit}
             >
               {loading ? "Logging you in .." : "Sign in"}{" "}
             </Button>

@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   AppBar,
   Toolbar,
   Box,
-  InputBase,
   Button,
   IconButton,
   Avatar,
@@ -15,15 +15,12 @@ import {
   ListItemButton,
   ListItemText,
   Typography,
-  Divider,
   useMediaQuery,
 } from "@mui/material";
 import {
-  Search as SearchIcon,
-  Notifications as NotificationsIcon,
-  Menu as MenuIcon,
-  Add as AddIcon,
-} from "@mui/icons-material";
+  MenuIcon,
+  AddIcon,
+} from "../common/icons";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../authContext";
 
@@ -39,7 +36,7 @@ export default function Navbar() {
   // Top navigation links
   const navLinks = [
     { label: "Dashboard", path: "/" },
-    { label: "Repositories", path: "/repositories" },
+    { label: "Repositories", path: "/dashboard" },
     { label: "Starred", path: "/starredRepo" },
   ];
 
@@ -72,6 +69,9 @@ export default function Navbar() {
         {isMobile && (
           <IconButton
             onClick={() => setDrawerOpen(true)}
+            aria-label="Open navigation menu"
+            aria-expanded={drawerOpen}
+            aria-haspopup="true"
             sx={{ color: "#f0f6fc" }}
           >
             <MenuIcon />
@@ -80,7 +80,9 @@ export default function Navbar() {
 
         {/* Logo */}
         <Box
-          onClick={() => navigate("/")}
+          component={Link}
+          to="/"
+          aria-label="GitVerse home"
           sx={{
             display: "flex",
             alignItems: "center",
@@ -136,45 +138,6 @@ export default function Navbar() {
 
         <Box sx={{ flexGrow: 1 }} />
 
-        {/* Search Input */}
-        {!isMobile && (
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              backgroundColor: "#0d1117",
-              border: "1px solid #30363d",
-              borderRadius: "6px",
-              px: 1.5,
-              py: 0.5,
-              width: "240px",
-              "&:focus-within": {
-                borderColor: "#58a6ff",
-                boxShadow: "0 0 0 3px rgba(56,139,253,0.3)",
-              },
-            }}
-          >
-            <SearchIcon sx={{ fontSize: 18, color: "#8b949e", mr: 1 }} />
-            <InputBase
-              placeholder="Type '/' to search"
-              sx={{
-                fontSize: "13px",
-                color: "#f0f6fc",
-                width: "100%",
-                "& input::placeholder": {
-                  color: "#8b949e",
-                  opacity: 1,
-                },
-              }}
-            />
-          </Box>
-        )}
-
-        {/* Notifications */}
-        <IconButton sx={{ color: "#c9d1d9", "&:hover": { color: "#f0f6fc" } }}>
-          <NotificationsIcon sx={{ fontSize: 20 }} />
-        </IconButton>
-
         {/* New Repo Button (Redirects to /createRepo) */}
         {!isMobile && (
           <Button
@@ -204,6 +167,9 @@ export default function Navbar() {
         {/* Profile Menu Avatar */}
         <IconButton
           onClick={(e) => setAnchorEl(e.currentTarget)}
+          aria-label="Open profile menu"
+          aria-expanded={Boolean(anchorEl)}
+          aria-haspopup="true"
           sx={{ p: 0.5 }}
         >
           <Avatar

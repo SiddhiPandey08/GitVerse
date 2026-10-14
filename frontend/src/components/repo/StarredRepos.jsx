@@ -1,44 +1,31 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import {
+  getAllRepositories,
+} from "../../api/repositories";
 import Navbar from "../navbar/Navbar";
-import { Box, Typography, Paper, Chip, Tabs, Tab } from "@mui/material";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
+import { Box, Typography, Paper, Chip, Tabs, Tab, Button } from "@mui/material";
+import { MenuBookIcon, StarBorderIcon } from "../common/icons";
 
 export default function StarredRepos() {
   const navigate = useNavigate();
   const [starredRepos, setStarredRepos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const userId = localStorage.getItem("userId");
 
   useEffect(() => {
     const fetchStarredRepos = async () => {
       if (!userId) return;
       try {
-        // Attempt fetching dedicated starred repositories
-        const response = await axios.get(
-          `http://localhost:3000/repositories/starred/${userId}`,
-        );
+        const response = await getAllRepositories();
         const repos = response.data.repositories || response.data || [];
-        setStarredRepos(repos);
+        setStarredRepos(
+          repos.filter((repo) => repo.isStarred === true),
+        );
       } catch (err) {
-        // Fallback: Fetch user repositories and filter explicitly by starred status
-        try {
-          const fallbackResponse = await axios.get(
-            `http://localhost:3000/repositories/user/${userId}`,
-          );
-          const allRepos =
-            fallbackResponse.data.repositories || fallbackResponse.data || [];
-
-          // Only keep repositories that are explicitly starred
-          const filtered = allRepos.filter(
-            (repo) => repo.isStarred === true || repo.starred === true,
-          );
-          setStarredRepos(filtered);
-        } catch (fallbackErr) {
-          console.error("Error fetching repositories:", fallbackErr);
-        }
+        console.error("Error fetching repositories:", err);
+        setError("Couldn't load starred repositories.");
       } finally {
         setLoading(false);
       }
@@ -105,6 +92,11 @@ export default function StarredRepos() {
           <Typography sx={{ color: "#8b949e" }}>
             Loading starred repositories...
           </Typography>
+        ) : error ? (
+          <Paper elevation={0} sx={{ p: 4, textAlign: "center", backgroundColor: "#161b22", border: "1px solid #30363d" }}>
+            <Typography sx={{ color: "#f85149", mb: 2 }}>{error}</Typography>
+            <Button variant="outlined" onClick={() => window.location.reload()}>Retry</Button>
+          </Paper>
         ) : starredRepos.length === 0 ? (
           <Paper
             elevation={0}

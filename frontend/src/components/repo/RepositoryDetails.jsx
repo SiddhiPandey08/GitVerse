@@ -1,6 +1,10 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import {
+  deleteRepository,
+  toggleStar,
+  toggleVisibility,
+} from "../../api/repositories";
 import Navbar from "../navbar/Navbar";
 import CommitHistory from "./CommitHistory";
 import RepoFiles from "./RepoFiles";
@@ -10,48 +14,38 @@ import {
   Typography,
   Chip,
   Button,
-  Paper,
-  CircularProgress,
+  Snackbar,
 } from "@mui/material";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import DeleteIcon from "@mui/icons-material/Delete";
-import StarIcon from "@mui/icons-material/Star";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
-import CallSplitIcon from "@mui/icons-material/CallSplit";
+import {
+  VisibilityIcon,
+  DeleteIcon,
+  StarIcon,
+  StarBorderIcon,
+} from "../common/icons";
+import useRepository from "../../hooks/useRepository";
+import useCommits from "../../hooks/useCommits";
+import LoadingState from "../common/LoadingState";
+import ErrorState from "../common/ErrorState";
 
 export default function RepositoryDetails() {
   const { repoId, id } = useParams();
   const activeId = repoId || id;
   const navigate = useNavigate();
 
-  const [repo, setRepo] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: repo, loading, error, reload } = useRepository(activeId);
+  const commitsState = useCommits(activeId);
+  const [repoOverride, setRepoOverride] = useState(null);
   const [toggling, setToggling] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [starring, setStarring] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [actionError, setActionError] = useState("");
+  const displayedRepo = repoOverride || repo;
 
-  // 1. Fetch Repository Details
   useEffect(() => {
-    const fetchRepo = async () => {
-      if (!activeId) return;
-      try {
-        const response = await axios.get(
-          `http://localhost:3000/repositories/${activeId}`,
-        );
-        setRepo(response.data);
-        // Sync initial starred status from backend repo data
-        setIsStarred(
-          Boolean(response.data?.isStarred || response.data?.starred),
-        );
-      } catch (err) {
-        console.error("Error fetching repository:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRepo();
-  }, [activeId]);
+    setIsStarred(Boolean(repo?.isStarred || repo?.starred));
+  }, [repo]);
 
   // 2. Toggle Visibility Handler
   const handleToggleVisibility = async () => {
@@ -59,15 +53,14 @@ export default function RepositoryDetails() {
 
     setToggling(true);
     try {
-      const response = await axios.patch(
-        `http://localhost:3000/repositories/toggle-visibility/${activeId}`,
-      );
+      const response = await toggleVisibility(activeId);
 
       if (response.data && response.data.updatedRepo) {
-        setRepo(response.data.updatedRepo);
+        setRepoOverride(response.data.updatedRepo);
       } else if (response.data) {
-        setRepo(response.data);
+        setRepoOverride(response.data);
       }
+      setNotice("Repository visibility updated.");
     } catch (err) {
       console.error(
         "Error toggling visibility:",
@@ -89,18 +82,17 @@ export default function RepositoryDetails() {
 
     try {
       // Calls PATCH endpoint matching toggle-visibility route pattern
-      const response = await axios.patch(
-        `http://localhost:3000/repositories/toggle-star/${activeId}`,
-      );
+      const response = await toggleStar(activeId);
 
       if (response.data && response.data.updatedRepo) {
-        setRepo(response.data.updatedRepo);
+        setRepoOverride(response.data.updatedRepo);
         setIsStarred(
           Boolean(
             response.data.updatedRepo.isStarred ||
             response.data.updatedRepo.starred,
           ),
         );
+        setNotice(response.data.updatedRepo.isStarred ? "Repository starred." : "Repository unstarred.");
       }
     } catch (err) {
       console.error(
@@ -116,34 +108,28 @@ export default function RepositoryDetails() {
   // 4. Delete Repository Handler
   const handleDeleteRepo = async () => {
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete "${repo?.name}"? This action cannot be undone.`,
+      `Are you sure you want to delete "${displayedRepo?.name}"? This action cannot be undone.`,
     );
     if (!confirmDelete || !activeId) return;
 
     setDeleting(true);
     try {
-      await axios.delete(
-        `http://localhost:3000/repositories/delete/${activeId}`,
-      );
-      navigate("/");
+      await deleteRepository(activeId);
+      navigate("/dashboard", {
+        state: { message: "Repository deleted successfully." },
+      });
     } catch (err) {
       console.error("Error deleting repository:", err);
-      alert(err.response?.data?.message || "Failed to delete repository.");
+      setActionError(err.response?.data?.message || "Failed to delete repository.");
     } finally {
       setDeleting(false);
     }
   };
 
-  const isPublic =
-    typeof repo?.visibility === "boolean"
-      ? repo.visibility
-      : repo?.visibility === "Private";
+  const isPublic = displayedRepo?.visibility === true;
 
   const getVisibilityLabel = () => {
-    if (typeof repo?.visibility === "boolean") {
-      return repo.visibility ? "Public" : "Private";
-    }
-    return repo?.visibility || "Public";
+    return isPublic ? "Public" : "Private";
   };
 
   if (loading) {
@@ -157,7 +143,18 @@ export default function RepositoryDetails() {
           alignItems: "center",
         }}
       >
-        <CircularProgress sx={{ color: "#58a6ff" }} />
+        <LoadingState message="Loading repository..." />
+      </Box>
+    );
+  }
+
+  if (error || !repo) {
+    return (
+      <Box sx={{ minHeight: "100vh", backgroundColor: "#0d1117", color: "#f0f6fc" }}>
+        <Navbar />
+        <Box sx={{ maxWidth: 760, mx: "auto", px: 3, py: 8 }}>
+          <ErrorState message={error || "Repository not found."} onRetry={reload} />
+        </Box>
       </Box>
     );
   }
@@ -168,21 +165,22 @@ export default function RepositoryDetails() {
     >
       <Navbar />
 
-      <Box sx={{ maxWidth: "1280px", mx: "auto", px: 3, py: 4 }}>
+      <Box sx={{ maxWidth: "1280px", mx: "auto", px: { xs: 2, md: 3 }, py: 4 }}>
         {/* Header Section */}
         <Box
           sx={{
             display: "flex",
+            flexWrap: "wrap",
             justifyContent: "space-between",
             alignItems: "center",
             mb: 3,
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Typography variant="h6" sx={{ color: "#58a6ff", fontWeight: 500 }}>
-              {repo?.owner?.username || "Owner"} /{" "}
+            <Typography variant="h6" sx={{ color: "#58a6ff", fontWeight: 500, minWidth: 0, overflowWrap: "anywhere" }}>
+              {displayedRepo?.owner?.username || "Owner"} /{" "}
               <span style={{ fontWeight: 700 }}>
-                {repo?.name || "Repository"}
+                {displayedRepo?.name || "Repository"}
               </span>
             </Typography>
 
@@ -224,30 +222,18 @@ export default function RepositoryDetails() {
             >
               {isStarred ? "Starred" : "Star"}
             </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<CallSplitIcon />}
-              sx={{
-                color: "#c9d1d9",
-                borderColor: "#30363d",
-                textTransform: "none",
-                backgroundColor: "#21262d",
-              }}
-            >
-              Fork
-            </Button>
           </Box>
         </Box>
 
         {/* Repository Content Grid */}
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 3 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 300px" }, gap: 3 }}>
           <Box>
             {/* Control Bar */}
             <Box
               sx={{
                 display: "flex",
-                justifyContent: "flex-end",
+                justifyContent: { xs: "stretch", sm: "flex-end" },
+                flexWrap: "wrap",
                 gap: 1.5,
                 mb: 2,
               }}
@@ -284,12 +270,15 @@ export default function RepositoryDetails() {
                 {deleting ? "Deleting..." : "Delete Repo"}
               </Button>
             </Box>
-            <RepoFiles repoId={activeId} />
-            <CommitHistory repoId={activeId} />
+            <Snackbar open={Boolean(notice)} autoHideDuration={4000} onClose={() => setNotice("")} message={notice} />
+            {actionError && <ErrorState message={actionError} />}
+            <RepoFiles repoId={activeId} commitsState={commitsState} />
+            <CommitHistory repoId={activeId} commitsState={commitsState} />
             <RepoReadme
               repoId={activeId}
-              name={repo?.name}
-              description={repo?.description}
+              name={displayedRepo?.name}
+              description={displayedRepo?.description}
+              commitsState={commitsState}
             />
           </Box>
 
@@ -299,7 +288,7 @@ export default function RepositoryDetails() {
               About
             </Typography>
             <Typography sx={{ color: "#8b949e", fontSize: "14px" }}>
-              {repo?.description || "No description provided."}
+              {displayedRepo?.description || "No description provided."}
             </Typography>
           </Box>
         </Box>

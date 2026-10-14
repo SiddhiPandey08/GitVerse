@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Box, Paper, Typography, CircularProgress } from "@mui/material";
+import { Box, Paper, Typography } from "@mui/material";
+import useCommits from "../../hooks/useCommits";
+import useRepoFile from "../../hooks/useRepoFile";
+import LoadingState from "../common/LoadingState";
+import ErrorState from "../common/ErrorState";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const README_RE = /^readme(\.md|\.markdown|\.txt)?$/i;
 const isMarkdown = (name) => /\.(md|markdown)$/i.test(name);
@@ -93,51 +95,61 @@ const markdownComponents = {
   ),
 };
 
-export default function RepoReadme({ repoId, name, description }) {
+function safeUrlTransform(url) {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (/^(https?:|mailto:|tel:)/i.test(trimmed) || trimmed.startsWith("/") || trimmed.startsWith("#")) {
+    return trimmed;
+  }
+  return "";
+}
+
+export default function RepoReadme({ repoId, name, description, commitsState }) {
   const [state, setState] = useState({ status: "loading" });
+  const { commits, loading: commitsLoading, error: commitsError, reload } = useCommits(repoId, commitsState);
+  const { load: loadFile } = useRepoFile(repoId);
 
   useEffect(() => {
-    if (!repoId) return;
     let cancelled = false;
 
-    setState({ status: "loading" });
+    if (commitsLoading) {
+      setState({ status: "loading" });
+      return undefined;
+    }
+    if (commitsError) {
+      setState({ status: "error", message: commitsError });
+      return undefined;
+    }
 
     (async () => {
       try {
-        const { data } = await axios.get(
-          `${API_URL}/repositories/${repoId}/commits`,
-        );
-        const readme = findReadme(data.commits || []);
+        const readme = findReadme(commits);
         if (!readme) {
           if (!cancelled) setState({ status: "none" });
           return;
         }
 
-        const res = await axios.get(`${API_URL}/repositories/${repoId}/file`, {
-          params: { key: readme.key },
-          responseType: "text",
-        });
+        const text = await loadFile(readme.key, "text");
         if (!cancelled) {
           setState({
             status: "ready",
             name: readme.name,
-            text: String(res.data),
+            text: String(text),
           });
         }
       } catch (err) {
-        // A README that can't load shouldn't break the page: fall back quietly.
         console.error(
           "Error loading README:",
           err.response?.data || err.message,
         );
-        if (!cancelled) setState({ status: "none" });
+        if (!cancelled) setState({ status: "error", message: "Couldn't load the README." });
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [repoId]);
+  }, [commits, commitsError, commitsLoading, loadFile]);
 
   const headerLabel = state.status === "ready" ? state.name : "README";
 
@@ -162,8 +174,12 @@ export default function RepoReadme({ repoId, name, description }) {
       </Box>
 
       {state.status === "loading" && (
-        <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
-          <CircularProgress size={22} sx={{ color: "#58a6ff" }} />
+        <LoadingState message="Loading README..." />
+      )}
+
+      {state.status === "error" && (
+        <Box sx={{ p: 2 }}>
+          <ErrorState message={state.message} onRetry={reload} />
         </Box>
       )}
 
@@ -173,6 +189,8 @@ export default function RepoReadme({ repoId, name, description }) {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={markdownComponents}
+              skipHtml
+              urlTransform={safeUrlTransform}
             >
               {state.text}
             </ReactMarkdown>

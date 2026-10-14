@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { Box, Paper, Typography, CircularProgress } from "@mui/material";
-import HistoryIcon from "@mui/icons-material/History";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { Box, Paper, Typography } from "@mui/material";
+import { HistoryIcon } from "../common/icons";
+import useCommits from "../../hooks/useCommits";
+import LoadingState from "../common/LoadingState";
+import EmptyState from "../common/EmptyState";
+import ErrorState from "../common/ErrorState";
 
 function timeAgo(dateString) {
   const seconds = Math.round((new Date(dateString) - Date.now()) / 1000);
@@ -26,47 +26,9 @@ function timeAgo(dateString) {
 // Keys look like "<repoId>/<commitId>/hello.txt"; show just the file name.
 const fileName = (key) => key.split("/").pop();
 
-export default function CommitHistory({ repoId }) {
-  const [commits, setCommits] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!repoId) return;
-    let cancelled = false;
-
-    setLoading(true);
-    setError("");
-
-    axios
-      .get(`${API_URL}/repositories/${repoId}/commits`)
-      .then((res) => {
-        // The API returns oldest first; show newest first.
-        if (!cancelled) setCommits([...(res.data.commits || [])].reverse());
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error(
-          "Error fetching commits:",
-          err.response?.data || err.message,
-        );
-        const status = err.response?.status;
-        if (status === 401) {
-          setError("Your session has expired. Log in again to see commits.");
-        } else if (status === 403) {
-          setError("Only the repository owner can view its commits.");
-        } else {
-          setError("Couldn't load commits. Check that the server is running.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repoId]);
+export default function CommitHistory({ repoId, commitsState }) {
+  const { commits: sourceCommits, loading, error, reload } = useCommits(repoId, commitsState);
+  const commits = [...sourceCommits].reverse();
 
   const latest = commits[0];
 
@@ -116,22 +78,20 @@ export default function CommitHistory({ repoId }) {
       </Box>
 
       {loading && (
-        <Box sx={{ p: 3, display: "flex", justifyContent: "center" }}>
-          <CircularProgress size={22} sx={{ color: "#58a6ff" }} />
-        </Box>
+        <LoadingState message="Loading commits..." />
       )}
 
       {!loading && error && (
-        <Typography sx={{ p: 2, fontSize: "14px", color: "#f85149" }}>
-          {error}
-        </Typography>
+        <Box sx={{ p: 2 }}><ErrorState message={error} onRetry={reload} /></Box>
       )}
 
       {!loading && !error && commits.length === 0 && (
-        <Typography sx={{ p: 2, fontSize: "14px", color: "#8b949e" }}>
+        <EmptyState message={
+          <>
           No commits yet. Run <code>init</code>, <code>add</code>,{" "}
           <code>commit</code> and <code>push</code> from the CLI to add some.
-        </Typography>
+          </>
+        } />
       )}
 
       {!loading &&

@@ -3,9 +3,9 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CssBaseline from "@mui/material/CssBaseline";
 import Divider from "@mui/material/Divider";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
 import FormControl from "@mui/material/FormControl";
+import Alert from "@mui/material/Alert";
 import { Link } from "react-router-dom";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -13,7 +13,7 @@ import Stack from "@mui/material/Stack";
 import MuiCard from "@mui/material/Card";
 import { styled } from "@mui/material/styles";
 import { useAuth } from "../../authContext";
-import axios from "axios";
+import { signUp } from "../../api/users";
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: "flex",
@@ -57,11 +57,12 @@ const SignUpContainer = styled(Stack)(({ theme }) => ({
   },
 }));
 
-export default function SignUp(props) {
+export default function SignUp() {
   const [email, setEmail] = React.useState("");
   const [username, setUserName] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState("");
 
   const [emailError, setEmailError] = React.useState(false);
   const [emailErrorMessage, setEmailErrorMessage] = React.useState("");
@@ -77,7 +78,7 @@ export default function SignUp(props) {
 
     let isValid = true;
 
-    if (!email.value) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
       setEmailError(true);
       setEmailErrorMessage("Please enter a valid email address.");
       isValid = false;
@@ -86,8 +87,9 @@ export default function SignUp(props) {
       setEmailErrorMessage("");
     }
 
-    if (!password.value) {
+    if (password.value.length < 8) {
       setPasswordError(true);
+      setPasswordErrorMessage("Password must be at least 8 characters.");
       isValid = false;
     } else {
       setPasswordError(false);
@@ -106,46 +108,35 @@ export default function SignUp(props) {
     return isValid;
   };
 
-  const handleSubmit = async (event) => {
-    if (nameError || emailError || passwordError) {
-      event.preventDefault();
-      return;
-    }
-  };
-
   const { setCurrUser } = useAuth();
 
   const handleSignUp = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:3000/users/signup", {
+      const res = await signUp({
         email: email,
         password: password,
         username: username,
       });
-      console.log(res.data);
-
       localStorage.setItem("token", res.data.token);
-      axios.defaults.headers.common["Authorization"] =
-        `Bearer ${res.data.token}`;
       localStorage.setItem("userId", res.data.userId);
-      setCurrUser(res.data.userId);
+      setCurrUser({ _id: res.data.userId, id: res.data.userId });
 
       setLoading(false);
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     } catch (error) {
       console.error(error);
-      alert("SignUp failed");
+      setSubmitError(
+        error.response?.data?.message || "Sign up failed. Please try again.",
+      );
       setLoading(false);
     }
   };
   const onSubmit = (e) => {
+    e.preventDefault();
     const isValid = validateInputs();
-
-    if (isValid) {
-      handleSignUp(e);
-    }
+    if (isValid) handleSignUp(e);
   };
 
   return (
@@ -174,9 +165,10 @@ export default function SignUp(props) {
           </Typography>
           <Box
             component="form"
-            onSubmit={handleSubmit}
+            onSubmit={onSubmit}
             sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
+            {submitError && <Alert severity="error">{submitError}</Alert>}
             <FormControl>
               <FormLabel style={{ alignSelf: "flex-start" }} htmlFor="name">
                 Full name
@@ -241,8 +233,8 @@ export default function SignUp(props) {
             <Button
               fullWidth
               variant="contained"
+              type="submit"
               disabled={loading}
-              onClick={onSubmit}
             >
               {loading ? "Signing you up .." : "SignUp"}
             </Button>

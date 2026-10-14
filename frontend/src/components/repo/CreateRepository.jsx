@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { createRepository } from "../../api/repositories";
 import Navbar from "../navbar/Navbar";
 import {
   Box,
@@ -14,8 +14,7 @@ import {
   Paper,
   Divider,
 } from "@mui/material";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import PublicIcon from "@mui/icons-material/Public";
+import { LockOutlinedIcon, PublicIcon } from "../common/icons";
 
 export default function CreateRepository() {
   const navigate = useNavigate();
@@ -29,8 +28,21 @@ export default function CreateRepository() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!repoName.trim()) {
-      setError("Repository name is required");
+    const trimmedName = repoName.trim();
+    if (!trimmedName) {
+      setError("Repository name is required.");
+      return;
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(trimmedName)) {
+      setError("Use only letters, numbers, dots, hyphens, and underscores.");
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setError("Repository name must be 100 characters or fewer.");
+      return;
+    }
+    if (description.length > 300) {
+      setError("Description must be 300 characters or fewer.");
       return;
     }
 
@@ -38,15 +50,12 @@ export default function CreateRepository() {
     setError("");
 
     try {
-      const response = await axios.post(
-        "http://localhost:3000/repositories/create",
-        {
-          name: repoName,
+      const response = await createRepository({
+          name: trimmedName,
           description,
           visibility: visibility,
           owner: userId,
-        },
-      );
+      });
 
       const newRepo = response.data.repository || response.data;
       if (newRepo?._id) {

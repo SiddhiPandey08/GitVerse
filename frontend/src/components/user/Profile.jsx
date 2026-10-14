@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { getRepositoriesByOwner } from "../../api/repositories";
+import { getUserProfile } from "../../api/users";
 import Navbar from "../navbar/Navbar";
 import HeatMapProfile from "./HeatMap";
 
@@ -11,14 +12,12 @@ import {
   Avatar,
   Tabs,
   Tab,
-  Grid,
 } from "@mui/material";
 
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
-import PeopleOutlineIcon from "@mui/icons-material/PeopleAlt"; // Updated import name
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOn"; // Updated import name
-import LinkOutlinedIcon from "@mui/icons-material/Link"; // Updated import name
+import {
+  MenuBookIcon,
+  StarBorderIcon,
+} from "../common/icons";
 export default function Profile() {
   const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
@@ -38,9 +37,7 @@ export default function Profile() {
     const fetchUserRepos = async () => {
       if (!userId) return;
       try {
-        const response = await axios.get(
-          `http://localhost:3000/repositories/owner/${userId}`,
-        );
+        const response = await getRepositoriesByOwner(userId);
         setUserRepos(response.data.repositories || []);
       } catch (err) {
         console.error("Cannot fetch user repositories:", err);
@@ -56,9 +53,7 @@ export default function Profile() {
       if (!userId) return;
 
       try {
-        const response = await axios.get(
-          `http://localhost:3000/users/userProfile/${userId}`,
-        );
+        const response = await getUserProfile(userId);
         setUserDetails(response.data);
       } catch (err) {
         console.error("Cannot fetch user details:", err);

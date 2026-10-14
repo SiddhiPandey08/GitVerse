@@ -1,16 +1,93 @@
-# React + Vite
+# GitVerse frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+GitVerse is a React 19 single-page frontend built with Vite, MUI, Tailwind CSS,
+Axios, and React Router. The frontend talks to the Express/MongoDB backend in
+the sibling `backend` directory.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20 or newer
+- A running GitVerse backend
+- MongoDB configured for the backend
 
-## React Compiler
+## Install
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+cd frontend
+npm install
+```
 
-## Expanding the ESLint configuration
+## Environment
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Copy `.env.example` to `.env` and set the backend URL:
+
+```dotenv
+VITE_API_URL=http://localhost:3000
+```
+
+Vite exposes environment variables at build time. Restart the dev server after
+changing `.env`.
+
+## Run
+
+Start the backend in one terminal, then start the frontend:
+
+```bash
+cd frontend
+npm run dev
+```
+
+The development server is normally available at `http://localhost:5173`.
+
+Useful scripts:
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start Vite with hot reload |
+| `npm run build` | Create a production build |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run the Vitest test suite |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run format` | Format frontend files with Prettier |
+
+## Routes
+
+Public routes:
+
+- `/` — landing page
+- `/auth` — sign in
+- `/signup` — account creation
+
+Authenticated routes:
+
+- `/dashboard` — personal and public repositories
+- `/create-new-repo` — create a repository
+- `/repositories/:repoId` — repository details, files, commits, and README
+- `/starredRepo` — starred repositories
+- `/profile` — user profile
+- `/edit-profile` — edit profile
+
+Unknown paths show the not-found page.
+
+## API overview
+
+The shared Axios client is in `src/api/client.js`. It attaches the JWT from
+local storage and redirects to `/auth` when the backend returns `401`.
+Components use service modules instead of constructing URLs:
+
+- `src/api/users.js`: login, signup, profile, and profile updates
+- `src/api/repositories.js`: repository CRUD, stars, visibility, commits, and files
+- `src/api/activity.js`: user activity
+
+The backend currently does not expose dedicated endpoints for global search,
+notifications, starred repositories, or forks. The frontend therefore omits
+those unsupported controls and derives starred repositories from the existing
+repository listing response.
+
+## Security notes
+
+The current authentication flow stores the JWT in `localStorage`, which is
+vulnerable to theft if an XSS issue is introduced. Moving the token to an
+HttpOnly, Secure, SameSite cookie would require an approved backend change;
+this frontend does not change that contract.

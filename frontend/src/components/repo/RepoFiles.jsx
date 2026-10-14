@@ -1,18 +1,23 @@
-import React, { useEffect, useRef, useState } from "react";
-import axios from "axios";
+import { useRef, useState } from "react";
 import {
   Box,
   Paper,
   Typography,
-  CircularProgress,
   Button,
   ButtonBase,
+  CircularProgress,
 } from "@mui/material";
-import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
-import DownloadIcon from "@mui/icons-material/Download";
-import CloseIcon from "@mui/icons-material/Close";
+import {
+  InsertDriveFileIcon,
+  DownloadIcon,
+  CloseIcon,
+} from "../common/icons";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import useCommits from "../../hooks/useCommits";
+import useRepoFile from "../../hooks/useRepoFile";
+import LoadingState from "../common/LoadingState";
+import EmptyState from "../common/EmptyState";
+import ErrorState from "../common/ErrorState";
 const MAX_PREVIEW_BYTES = 1024 * 1024; // 1 MB
 
 const TEXT_EXTENSIONS = new Set([
@@ -50,6 +55,8 @@ const TEXT_EXTENSIONS = new Set([
   "sql",
   "gitignore",
 ]);
+const SECRET_FILE_RE =
+  /(^|\/)(\.env(\..*)?|.*\.(pem|key|p12|pfx|crt|cer)|id_(rsa|dsa|ecdsa)|authorized_keys)$/i;
 
 // Keys look like "<repoId>/<commitId>/hello.txt"; show just the file name.
 const fileName = (key) => key.split("/").pop();
@@ -59,6 +66,10 @@ function isTextLike(name) {
   const dot = name.lastIndexOf(".");
   if (dot === -1) return true;
   return TEXT_EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
+}
+
+export function isSecretLike(name) {
+  return SECRET_FILE_RE.test(name);
 }
 
 // Commits arrive oldest first, so a later commit replaces an earlier
@@ -73,64 +84,25 @@ function currentFiles(commits) {
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function fetchFileBlob(repoId, key) {
-  const res = await axios.get(`${API_URL}/repositories/${repoId}/file`, {
-    params: { key },
-    responseType: "blob",
-  });
-  return res.data;
-}
-
-function describeError(err) {
-  const status = err.response?.status;
-  if (status === 401) return "Your session has expired. Log in again.";
-  if (status === 403) return "Only the repository owner can view files.";
-  if (status === 404) return "This file no longer exists in storage.";
-  return "Couldn't load the file. Check that the server is running.";
-}
-
-export default function RepoFiles({ repoId }) {
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
+export default function RepoFiles({ repoId, commitsState }) {
   const [selected, setSelected] = useState(null);
   const [viewer, setViewer] = useState({ status: "idle" });
   const requestId = useRef(0);
-
-  useEffect(() => {
-    if (!repoId) return;
-    let cancelled = false;
-
-    setLoading(true);
-    setError("");
-    setSelected(null);
-
-    axios
-      .get(`${API_URL}/repositories/${repoId}/commits`)
-      .then((res) => {
-        if (!cancelled) setFiles(currentFiles(res.data.commits || []));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error(
-          "Error fetching files:",
-          err.response?.data || err.message,
-        );
-        setError(describeError(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repoId]);
+  const { commits, loading, error, reload } = useCommits(repoId, commitsState);
+  const files = currentFiles(commits);
+  const { load: loadFile } = useRepoFile(repoId);
 
   const openFile = async (file) => {
     const id = ++requestId.current; // ignore results from files clicked earlier
     setSelected(file);
+
+    if (isSecretLike(file.name)) {
+      setViewer({
+        status: "nopreview",
+        message: "Preview is disabled for secret-like files.",
+      });
+      return;
+    }
 
     if (!isTextLike(file.name)) {
       setViewer({
@@ -142,7 +114,7 @@ export default function RepoFiles({ repoId }) {
 
     setViewer({ status: "loading" });
     try {
-      const blob = await fetchFileBlob(repoId, file.key);
+      const blob = await loadFile(file.key);
       if (id !== requestId.current) return;
 
       if (blob.size > MAX_PREVIEW_BYTES) {
@@ -166,7 +138,7 @@ export default function RepoFiles({ repoId }) {
     } catch (err) {
       if (id !== requestId.current) return;
       console.error("Error opening file:", err.message);
-      setViewer({ status: "error", message: describeError(err) });
+      setViewer({ status: "error", message: err.message || "Couldn't load the file." });
     }
   };
 
@@ -177,7 +149,7 @@ export default function RepoFiles({ repoId }) {
 
   const downloadFile = async (file) => {
     try {
-      const blob = await fetchFileBlob(repoId, file.key);
+      const blob = await loadFile(file.key);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -188,7 +160,7 @@ export default function RepoFiles({ repoId }) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error downloading file:", err.message);
-      setViewer({ status: "error", message: describeError(err) });
+      setViewer({ status: "error", message: err.message || "Couldn't download the file." });
     }
   };
 
@@ -221,30 +193,23 @@ export default function RepoFiles({ repoId }) {
         </span>
       </Box>
 
-      {loading && (
-        <Box sx={{ p: 3, display: "flex", justifyContent: "center" }}>
-          <CircularProgress size={22} sx={{ color: "#58a6ff" }} />
+      {loading && <LoadingState message="Loading files..." />}
+
+      {!loading && error && (
+        <Box sx={{ p: 2 }}>
+          <ErrorState message={error} onRetry={reload} />
         </Box>
       )}
 
-      {!loading && error && (
-        <Typography sx={{ p: 2, fontSize: "14px", color: "#f85149" }}>
-          {error}
-        </Typography>
-      )}
-
       {!loading && !error && files.length === 0 && (
-        <Typography sx={{ p: 2, fontSize: "14px", color: "#8b949e" }}>
-          No files yet. Add a file and run <code>commit</code> and{" "}
-          <code>push</code> from the CLI.
-        </Typography>
+        <EmptyState message="No files yet. Add a file and run commit and push from the CLI." />
       )}
 
       {!loading &&
         !error &&
         files.map((file, i) => (
           <ButtonBase
-            key={file.name}
+            key={file.key}
             onClick={() => openFile(file)}
             sx={{
               width: "100%",

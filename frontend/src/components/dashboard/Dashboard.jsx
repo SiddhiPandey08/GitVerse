@@ -1,15 +1,24 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Snackbar } from "@mui/material";
 import "./dashboard.css";
 import Navbar from "../navbar/Navbar";
+import {
+  getAllRepositories,
+  getRepositoriesByOwner,
+} from "../../api/repositories";
 
 export default function Dashboard() {
+  const location = useLocation();
   const [repositories, setRepositories] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestedRepos, setSuggestedRepos] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [loadingRepos, setLoadingRepos] = useState(true);
   const [loadingSuggested, setLoadingSuggested] = useState(true);
+  const [repoError, setRepoError] = useState("");
+  const [suggestedError, setSuggestedError] = useState("");
+  const [notice, setNotice] = useState(location.state?.message || "");
 
   useEffect(() => {
     const repoOwner = localStorage.getItem("userId");
@@ -21,17 +30,11 @@ export default function Dashboard() {
         return;
       }
       try {
-        const response = await fetch(
-          `http://localhost:3000/repositories/owner/${repoOwner}`,
-        );
-        if (response.status === 404) {
-          setRepositories([]);
-          return;
-        }
-        const data = await response.json();
+        const { data } = await getRepositoriesByOwner(repoOwner);
         setRepositories(data.repositories || []);
       } catch (err) {
-        console.log("error fetching repositories:", err.message);
+        console.error("Error fetching repositories:", err);
+        setRepoError("Couldn't load your repositories.");
       } finally {
         setLoadingRepos(false);
       }
@@ -39,11 +42,11 @@ export default function Dashboard() {
 
     const fetchSuggestedRepositories = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/repositories/all`);
-        const data = await response.json();
+        const { data } = await getAllRepositories();
         setSuggestedRepos(data.repositories || []);
       } catch (err) {
-        console.log("error fetching suggested repositories:", err.message);
+        console.error("Error fetching suggested repositories:", err);
+        setSuggestedError("Couldn't load suggestions.");
       } finally {
         setLoadingSuggested(false);
       }
@@ -52,6 +55,12 @@ export default function Dashboard() {
     fetchRepositories();
     fetchSuggestedRepositories();
   }, []);
+
+  useEffect(() => {
+    if (location.state?.message) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (searchQuery === "") {
@@ -73,15 +82,19 @@ export default function Dashboard() {
           <h2>Suggested Repositories</h2>
           {loadingSuggested ? (
             <p className="empty-state">Loading suggestions...</p>
+          ) : suggestedError ? (
+            <p className="empty-state">
+              {suggestedError}{" "}
+              <button type="button" onClick={() => window.location.reload()}>
+                Retry
+              </button>
+            </p>
           ) : suggestedRepos.length === 0 ? (
             <p className="empty-state">No suggestions yet.</p>
           ) : (
             <div className="repo-list">
               {suggestedRepos
-                .filter(
-                  (repo) =>
-                    repo.visibility === true || repo.visibility === "Public",
-                )
+                .filter((repo) => repo.visibility === true)
                 .map((repo) => (
                   <Link
                     to={`/repositories/${repo._id}`}
@@ -127,6 +140,13 @@ export default function Dashboard() {
 
           {loadingRepos ? (
             <p className="empty-state">Loading your repositories...</p>
+          ) : repoError ? (
+            <p className="empty-state">
+              {repoError}{" "}
+              <button type="button" onClick={() => window.location.reload()}>
+                Retry
+              </button>
+            </p>
           ) : searchResults.length === 0 ? (
             <p className="empty-state">
               {searchQuery
@@ -135,12 +155,7 @@ export default function Dashboard() {
             </p>
           ) : (
             <div className="repo-list">
-              {searchResults
-                .filter(
-                  (repo) =>
-                    repo.visibility === true || repo.visibility === "Public",
-                )
-                .map((repo) => (
+              {searchResults.map((repo) => (
                   <Link
                     to={`/repositories/${repo._id}`}
                     className="repo-row"
@@ -163,10 +178,7 @@ export default function Dashboard() {
                           <h4>{repo.name}</h4>
                         </div>
                         <span className="badge-visibility">
-                          {repo.visibility === true ||
-                          repo.visibility === "Public"
-                            ? "Public"
-                            : "Private"}
+                          {repo.visibility ? "Public" : "Private"}
                         </span>
                       </div>
 
@@ -196,46 +208,19 @@ export default function Dashboard() {
           )}
         </main>
 
-        {/* Right Column: Upcoming Events */}
         <aside className="panel-card">
-          <h3>Upcoming Events</h3>
-          <ul className="events-list">
-            <li>
-              <div className="event-icon">
-                {/* Calendar SVG Icon */}
-                <svg
-                  aria-hidden="true"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  version="1.1"
-                  width="16"
-                >
-                  <path d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25V3.75C1 2.784 1.784 2 2.75 2H4V.75A.75.75 0 0 1 4.75 0zm0 3.5h-2a.25.25 0 0 0-.25.25V5h11V3.75a.25.25 0 0 0-.25-.25h-2V4.5a.75.75 0 0 1-1.5 0V3.5h-5V4.5a.75.75 0 0 1-1.5 0V3.5zM2.5 6.5v7.75c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V6.5H2.5z"></path>
-                </svg>
-              </div>
-              <div className="event-body">
-                <p>Tech Meetup - 1</p>
-              </div>
-            </li>
-            <li>
-              <div className="event-icon">
-                <svg
-                  aria-hidden="true"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  version="1.1"
-                  width="16"
-                >
-                  <path d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25V3.75C1 2.784 1.784 2 2.75 2H4V.75A.75.75 0 0 1 4.75 0zm0 3.5h-2a.25.25 0 0 0-.25.25V5h11V3.75a.25.25 0 0 0-.25-.25h-2V4.5a.75.75 0 0 1-1.5 0V3.5h-5V4.5a.75.75 0 0 1-1.5 0V3.5zM2.5 6.5v7.75c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V6.5H2.5z"></path>
-                </svg>
-              </div>
-              <div className="event-body">
-                <p>Tech Meetup - 2</p>
-              </div>
-            </li>
-          </ul>
+          <h3>Activity</h3>
+          <p className="empty-state">
+            Repository activity will appear here as you create commits and collaborate.
+          </p>
         </aside>
       </section>
+      <Snackbar
+        open={Boolean(notice)}
+        autoHideDuration={4000}
+        onClose={() => setNotice("")}
+        message={notice}
+      />
     </div>
   );
 }

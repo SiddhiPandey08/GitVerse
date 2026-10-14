@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { getUserProfile, updateUserProfile } from "../../api/users";
 import Navbar from "../navbar/Navbar";
 import {
   Box,
@@ -33,9 +33,7 @@ export default function EditProfile() {
     const fetchUserData = async () => {
       if (!userId) return;
       try {
-        const response = await axios.get(
-          `http://localhost:3000/user/profile/${userId}`,
-        );
+        const response = await getUserProfile(userId);
         const data = response.data.user || response.data;
         setUsername(data.username || "");
         setEmail(data.email || "");
@@ -59,11 +57,23 @@ export default function EditProfile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setMessage({ type: "error", text: "Enter a valid email address." });
+      return;
+    }
+    if (website && !/^https?:\/\/\S+$/i.test(website)) {
+      setMessage({ type: "error", text: "Website must start with http:// or https://." });
+      return;
+    }
+    if (username.length > 50 || bio.length > 280 || location.length > 100 || website.length > 200) {
+      setMessage({ type: "error", text: "One or more fields exceed the allowed length." });
+      return;
+    }
     setSaving(true);
     setMessage({ type: "", text: "" });
 
     try {
-      await axios.put(`http://localhost:3000/users/updateProfile/${userId}`, {
+      await updateUserProfile(userId, {
         username,
         email,
         bio,
