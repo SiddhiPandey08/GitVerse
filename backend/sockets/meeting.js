@@ -1,20 +1,9 @@
-import { Server } from "socket.io";
-
 let connections = {}; // roomId -> [{ socketId, username }]
 let messages = {};
 let timeOnline = {};
 let mediaStatus = {}; // socketId -> { audio, video }
 
-const connectToSocket = (server) => {
-  const io = new Server(server, {
-    cors: {
-      origin: ["https://meridian-vst3.vercel.app", "http://localhost:5173"],
-      methods: ["GET", "POST"],
-      allowedHeaders: ["*"],
-      credentials: true,
-    },
-  });
-
+const registerMeetingSockets = (io) => {
   io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
 
@@ -24,7 +13,7 @@ const connectToSocket = (server) => {
       }
       connections[roomId].push({
         socketId: socket.id,
-        username: username || "Guest",
+        username: socket.user?.name || username || "Guest",
       });
       timeOnline[socket.id] = new Date();
       mediaStatus[socket.id] = { audio: true, video: true };
@@ -131,8 +120,6 @@ const connectToSocket = (server) => {
       }
     });
   });
-
-  return io;
 };
 
-export default connectToSocket;
+export default registerMeetingSockets;

@@ -4,6 +4,10 @@ import mongoose from "mongoose";
 import http from "http";
 import { Server } from "socket.io";
 import mainRouter from "./routes/main.router.js";
+import jwt from "jsonwebtoken";
+import User from "./models/userModel.js";
+import meetingRouter from "./routes/meeting.router.js";
+import registerMeetingSockets from "./sockets/meeting.js";
 
 export async function startServer() {
   console.log("Initializing the server...");
@@ -16,13 +20,27 @@ export async function startServer() {
   const app = express();
   app.use(cors({ origin: "*" }));
   app.use(express.json()); // body-parser is redundant with Express 5
-
+  app.use("/meetings", meetingRouter);
   app.use("/", mainRouter);
 
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: { origin: "*", methods: ["GET", "POST"] },
   });
+
+  io.use(async (socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(); // no token = guest
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.user = await User.findById(decoded.id);
+      next();
+    } catch {
+      next(new Error("Invalid token"));
+    }
+  });
+
+  registerMeetingSockets(io);
 
   io.on("connection", (socket) => {
     socket.on("join-room", (userId) => {
