@@ -1,27 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  deleteRepository,
-  toggleStar,
-  toggleVisibility,
-} from "../../api/repositories";
+import { deleteRepository, toggleStar, toggleVisibility } from "../../api/repositories";
 import Navbar from "../navbar/Navbar";
 import CommitHistory from "./CommitHistory";
 import RepoFiles from "./RepoFiles";
 import RepoReadme from "./RepoReadme";
-import {
-  Box,
-  Typography,
-  Chip,
-  Button,
-  Snackbar,
-} from "@mui/material";
-import {
-  VisibilityIcon,
-  DeleteIcon,
-  StarIcon,
-  StarBorderIcon,
-} from "../common/icons";
+import { VideoCamera } from "@phosphor-icons/react";
+import client from "../../api/client";
+import { Box, Typography, Chip, Button, Snackbar } from "@mui/material";
+import { VisibilityIcon, DeleteIcon, StarIcon, StarBorderIcon } from "../common/icons";
 import useRepository from "../../hooks/useRepository";
 import useCommits from "../../hooks/useCommits";
 import LoadingState from "../common/LoadingState";
@@ -62,10 +49,7 @@ export default function RepositoryDetails() {
       }
       setNotice("Repository visibility updated.");
     } catch (err) {
-      console.error(
-        "Error toggling visibility:",
-        err.response?.data || err.message,
-      );
+      console.error("Error toggling visibility:", err.response?.data || err.message);
     } finally {
       setToggling(false);
     }
@@ -88,21 +72,27 @@ export default function RepositoryDetails() {
         setRepoOverride(response.data.updatedRepo);
         setIsStarred(
           Boolean(
-            response.data.updatedRepo.isStarred ||
-            response.data.updatedRepo.starred,
+            response.data.updatedRepo.isStarred || response.data.updatedRepo.starred,
           ),
         );
-        setNotice(response.data.updatedRepo.isStarred ? "Repository starred." : "Repository unstarred.");
+        setNotice(
+          response.data.updatedRepo.isStarred
+            ? "Repository starred."
+            : "Repository unstarred.",
+        );
       }
     } catch (err) {
-      console.error(
-        "Error toggling star status:",
-        err.response?.data || err.message,
-      );
+      console.error("Error toggling star status:", err.response?.data || err.message);
       setIsStarred(previousState); // Revert state if backend request fails
     } finally {
       setStarring(false);
     }
+  };
+  const handleStartCall = () => {
+    client
+      .post("/meetings/history", { meeting_code: `repo-${activeId}` })
+      .catch(() => {});
+    navigate(`/meet/repo-${activeId}`);
   };
 
   // 4. Delete Repository Handler
@@ -160,9 +150,7 @@ export default function RepositoryDetails() {
   }
 
   return (
-    <Box
-      sx={{ minHeight: "100vh", backgroundColor: "#0d1117", color: "#f0f6fc" }}
-    >
+    <Box sx={{ minHeight: "100vh", backgroundColor: "#0d1117", color: "#f0f6fc" }}>
       <Navbar />
 
       <Box sx={{ maxWidth: "1280px", mx: "auto", px: { xs: 2, md: 3 }, py: 4 }}>
@@ -177,7 +165,15 @@ export default function RepositoryDetails() {
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Typography variant="h6" sx={{ color: "#58a6ff", fontWeight: 500, minWidth: 0, overflowWrap: "anywhere" }}>
+            <Typography
+              variant="h6"
+              sx={{
+                color: "#58a6ff",
+                fontWeight: 500,
+                minWidth: 0,
+                overflowWrap: "anywhere",
+              }}
+            >
               {displayedRepo?.owner?.username || "Owner"} /{" "}
               <span style={{ fontWeight: 700 }}>
                 {displayedRepo?.name || "Repository"}
@@ -198,7 +194,21 @@ export default function RepositoryDetails() {
               }}
             />
           </Box>
-
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleStartCall}
+            startIcon={<VideoCamera size={16} />}
+            sx={{
+              color: "#c9d1d9",
+              borderColor: "#30363d",
+              textTransform: "none",
+              backgroundColor: "#21262d",
+              "&:hover": { backgroundColor: "#30363d" },
+            }}
+          >
+            Start call
+          </Button>
           <Box sx={{ display: "flex", gap: 1 }}>
             <Button
               variant="outlined"
@@ -206,11 +216,7 @@ export default function RepositoryDetails() {
               disabled={starring}
               onClick={handleStarToggle}
               startIcon={
-                isStarred ? (
-                  <StarIcon sx={{ color: "#e3b341" }} />
-                ) : (
-                  <StarBorderIcon />
-                )
+                isStarred ? <StarIcon sx={{ color: "#e3b341" }} /> : <StarBorderIcon />
               }
               sx={{
                 color: isStarred ? "#e3b341" : "#c9d1d9",
@@ -226,7 +232,13 @@ export default function RepositoryDetails() {
         </Box>
 
         {/* Repository Content Grid */}
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 300px" }, gap: 3 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1fr) 300px" },
+            gap: 3,
+          }}
+        >
           <Box>
             {/* Control Bar */}
             <Box
@@ -270,7 +282,12 @@ export default function RepositoryDetails() {
                 {deleting ? "Deleting..." : "Delete Repo"}
               </Button>
             </Box>
-            <Snackbar open={Boolean(notice)} autoHideDuration={4000} onClose={() => setNotice("")} message={notice} />
+            <Snackbar
+              open={Boolean(notice)}
+              autoHideDuration={4000}
+              onClose={() => setNotice("")}
+              message={notice}
+            />
             {actionError && <ErrorState message={actionError} />}
             <RepoFiles repoId={activeId} commitsState={commitsState} />
             <CommitHistory repoId={activeId} commitsState={commitsState} />

@@ -1,0 +1,20 @@
+.meeting-theme {
+  --cream: #f4efe6;
+  --cream-dim: #ece4d6;
+  --ink: #2a2420;
+  --ink-soft: #574c43;
+  --rust: #c25b41;
+  --rust-dark: #9c4530;
+  --sage: #7c8a68;
+  --sage-dark: #5f6b4f;
+  --navy: #2d4356;
+  --navy-dark: #1d2c38;
+  --mustard: #d9a441;
+  --dust-blue: #93aabd;
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-lg: 28px;
+  --shadow-soft: 0 10px 30px rgba(42, 36, 32, 0.12);
+  --font-display: inherit;
+  --font-body: inherit;
+}
