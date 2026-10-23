@@ -12,6 +12,7 @@ import CreateRepository from "./components/repo/CreateRepository";
 import NotFound from "./components/common/NotFound";
 import RequireAuth from "./components/common/RequireAuth";
 import Landing from "./components/landing/Landing";
+import VideoMeet from "./features/meeting/VideoMeet";
 // Auth Context
 import { useAuth } from "./authContext";
 
@@ -83,6 +84,14 @@ const ProjectRoutes = () => {
     {
       path: "*",
       element: <NotFound />,
+    },
+    {
+      path: "/meet/:url",
+      element: (
+        <RequireAuth>
+          <VideoMeet />
+        </RequireAuth>
+      ),
     },
   ]);
 
