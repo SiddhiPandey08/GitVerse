@@ -1,13 +1,32 @@
+import mongoose from "mongoose";
+import Repository from "../models/repoModel.js";
+
 let connections = {}; // roomId -> [{ socketId, username }]
 let messages = {};
 let timeOnline = {};
 let mediaStatus = {}; // socketId -> { audio, video }
 
+const canJoin = async (roomId, user) => {
+  if (!user) return false; // guests are no longer allowed
+  // the client sends the full page URL as the room id, so take the last segment
+  const code = String(roomId).split("?")[0].split("/").pop();
+  if (!code.startsWith("repo-")) return true; // ad-hoc rooms: any logged-in user
+  const repoId = code.slice(5);
+  if (!mongoose.isValidObjectId(repoId)) return false;
+  const repo = await Repository.findById(repoId).select("owner visibility");
+  if (!repo) return false;
+  return repo.visibility === true || String(repo.owner) === String(user._id);
+};
+
 const registerMeetingSockets = (io) => {
   io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
 
-    socket.on("join-call", (roomId, username) => {
+    socket.on("join-call", async (roomId, username) => {
+      if (!(await canJoin(roomId, socket.user))) {
+        socket.emit("join-denied");
+        return;
+      }
       if (connections[roomId] === undefined) {
         connections[roomId] = [];
       }

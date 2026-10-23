@@ -8,6 +8,8 @@ import jwt from "jsonwebtoken";
 import User from "./models/userModel.js";
 import meetingRouter from "./routes/meeting.router.js";
 import registerMeetingSockets from "./sockets/meeting.js";
+import chatRouter from "./routes/chat.router.js";
+import registerChannelSockets from "./sockets/channels.js";
 
 export async function startServer() {
   console.log("Initializing the server...");
@@ -21,6 +23,7 @@ export async function startServer() {
   app.use(cors({ origin: "*" }));
   app.use(express.json()); // body-parser is redundant with Express 5
   app.use("/meetings", meetingRouter);
+  app.use("/chat", chatRouter);
   app.use("/", mainRouter);
 
   const httpServer = http.createServer(app);
@@ -41,6 +44,7 @@ export async function startServer() {
   });
 
   registerMeetingSockets(io);
+  registerChannelSockets(io);
 
   io.on("connection", (socket) => {
     socket.on("join-room", (userId) => {

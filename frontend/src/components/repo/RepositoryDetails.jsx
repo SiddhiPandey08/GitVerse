@@ -5,6 +5,7 @@ import Navbar from "../navbar/Navbar";
 import CommitHistory from "./CommitHistory";
 import RepoFiles from "./RepoFiles";
 import RepoReadme from "./RepoReadme";
+import RepoChat from "./RepoChat";
 import { VideoCamera } from "@phosphor-icons/react";
 import client from "../../api/client";
 import { Box, Typography, Chip, Button, Snackbar } from "@mui/material";
@@ -28,7 +29,11 @@ export default function RepositoryDetails() {
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
+  const [repoTab, setRepoTab] = useState("code"); // "code" | "chat"
   const displayedRepo = repoOverride || repo;
+  const isOwner =
+    String(displayedRepo?.owner?._id || displayedRepo?.owner) ===
+    localStorage.getItem("userId");
 
   useEffect(() => {
     setIsStarred(Boolean(repo?.isStarred || repo?.starred));
@@ -289,14 +294,55 @@ export default function RepositoryDetails() {
               message={notice}
             />
             {actionError && <ErrorState message={actionError} />}
-            <RepoFiles repoId={activeId} commitsState={commitsState} />
-            <CommitHistory repoId={activeId} commitsState={commitsState} />
-            <RepoReadme
-              repoId={activeId}
-              name={displayedRepo?.name}
-              description={displayedRepo?.description}
-              commitsState={commitsState}
-            />
+
+            {/* Code | Chat tab switch */}
+            <Box
+              sx={{
+                display: "flex",
+                borderBottom: "1px solid #30363d",
+                mb: 2,
+              }}
+            >
+              {["code", "chat"].map((tab) => (
+                <Box
+                  key={tab}
+                  onClick={() => setRepoTab(tab)}
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    textTransform: "capitalize",
+                    cursor: "pointer",
+                    color: repoTab === tab ? "#f0f6fc" : "#8b949e",
+                    borderBottom: repoTab === tab ? "2px solid #f78166" : "2px solid transparent",
+                    mb: "-1px",
+                    transition: "color 0.15s, border-color 0.15s",
+                    userSelect: "none",
+                    "&:hover": { color: "#f0f6fc" },
+                  }}
+                >
+                  {tab === "code" ? "\u{1F4C1} Code" : "\u{1F4AC} Chat"}
+                </Box>
+              ))}
+            </Box>
+
+            {repoTab === "code" && (
+              <>
+                <RepoFiles repoId={activeId} commitsState={commitsState} />
+                <CommitHistory repoId={activeId} commitsState={commitsState} />
+                <RepoReadme
+                  repoId={activeId}
+                  name={displayedRepo?.name}
+                  description={displayedRepo?.description}
+                  commitsState={commitsState}
+                />
+              </>
+            )}
+
+            {repoTab === "chat" && (
+              <RepoChat repoId={activeId} isOwner={isOwner} />
+            )}
           </Box>
 
           {/* Sidebar */}

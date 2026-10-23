@@ -326,7 +326,9 @@ function VideoMeetComponent() {
       try {
         let tracks = localVideoref.current.srcObject.getTracks();
         tracks.forEach((track) => track.stop());
-      } catch (e) {}
+      } catch (e) {
+        console.log(e);
+      }
     }
   };
 
@@ -505,6 +507,17 @@ function VideoMeetComponent() {
       auth: { token: localStorage.getItem("token") },
     });
     socketRef.current.on("signal", gotMessageFromServer);
+    socketRef.current.on("join-denied", () => {
+      try {
+        window.localStream?.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        console.log(e);
+      }
+      socketRef.current.disconnect();
+      navigate("/dashboard", {
+        state: { message: "You don't have access to that call." },
+      });
+    });
 
     socketRef.current.on("connect", () => {
       socketRef.current.emit("join-call", window.location.href, username);
