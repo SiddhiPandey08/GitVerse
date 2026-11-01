@@ -80,6 +80,9 @@ function currentFiles(commits) {
     for (const key of commit.files || []) {
       byName.set(fileName(key), { name: fileName(key), key, commit });
     }
+    for (const removed of commit.removedFiles || []) {
+      byName.delete(removed);
+    }
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

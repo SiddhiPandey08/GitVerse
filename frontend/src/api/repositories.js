@@ -1,3 +1,6 @@
+// repositories.js — API client methods for repository CRUD, commits, files, and collaborator/revert actions.
+// Talks to: backend repo.router.js via client.js.
+
 import client from "./client";
 
 export const normalizeVisibility = (visibility) =>
@@ -56,3 +59,23 @@ export const getRepositoryFile = (repoId, key, responseType = "json") =>
     params: { key },
     responseType,
   });
+
+// Fetches the list of collaborators for a repository (owner-only endpoint).
+export const listCollaborators = (repoId) =>
+  client.get(`/repositories/${repoId}/collaborators`);
+
+// Adds a user as a collaborator by username (owner-only).
+export const addCollaborator = (repoId, username) =>
+  client.post(`/repositories/${repoId}/collaborators`, { username });
+
+// Removes a user from collaborators by username (owner-only).
+export const removeCollaborator = (repoId, username) =>
+  client.delete(`/repositories/${repoId}/collaborators/${username}`);
+
+// Marks a commit as reviewed (owner-only). Stamps reviewedBy and posts to #general.
+export const markCommitReviewed = (repoId, commitId) =>
+  client.patch(`/repositories/${repoId}/commits/${commitId}/reviewed`);
+
+// Reverts a specific commit on the server by reusing earlier S3 keys (owner-only).
+export const revertCommit = (repoId, commitId) =>
+  client.post(`/repositories/${repoId}/commits/${commitId}/revert`);

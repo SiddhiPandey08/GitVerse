@@ -1,15 +1,42 @@
+// sockets/channels.js — persistent channel socket events (join, leave, message).
+// Talks to: channelModel.js, chatMessageModel.js, utils/repoAccess.js.
+// Connected to by server.js via registerChannelSockets(io).
+
 import Channel from "../models/channelModel.js";
 import ChatMessage from "../models/chatMessageModel.js";
 import { getRepoAccess } from "../utils/repoAccess.js";
+
+// In-memory rate limiter: tracks how many messages each socket has sent
+// within the current 3-second window.  Max 5 messages per 3 s per socket.
+// Simple and fast — no Redis needed for this use-case. Resets on disconnect.
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 3000;
+const rateLimitMap = new Map(); // socketId -> { count, resetAt }
+
+function checkRateLimit(socketId) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(socketId) ?? { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+
+  if (now > entry.resetAt) {
+    // Window expired — start a fresh one.
+    entry.count = 0;
+    entry.resetAt = now + RATE_LIMIT_WINDOW_MS;
+  }
+
+  entry.count += 1;
+  rateLimitMap.set(socketId, entry);
+
+  return entry.count <= RATE_LIMIT_MAX;
+}
 
 /**
  * Register persistent channel socket events on the given io instance.
  * Room naming convention: `channel:<channelId>`
  *
  * Events:
- *   channel:join  (channelId, ack)  – join a channel room if access is granted
- *   channel:leave (channelId)       – leave a channel room
- *   channel:message (channelId, text, ack) – persist and broadcast a message
+ *   channel:join    (channelId, ack)        – join a channel room if access is granted
+ *   channel:leave   (channelId)             – leave a channel room
+ *   channel:message (channelId, text, ack)  – persist and broadcast a message
  *
  * @param {import("socket.io").Server} io
  */
@@ -48,6 +75,11 @@ const registerChannelSockets = (io) => {
         // Must be authenticated.
         if (!socket.user) return ack({ ok: false, reason: "unauthenticated" });
 
+        // Rate-limit: max 5 messages per 3 seconds per socket.
+        if (!checkRateLimit(socket.id)) {
+          return ack({ ok: false, reason: "rate limit exceeded" });
+        }
+
         const room = `channel:${channelId}`;
 
         // Socket must already be in the room (prevents drive-by messages).
@@ -85,6 +117,11 @@ const registerChannelSockets = (io) => {
       } catch {
         ack({ ok: false, reason: "server error" });
       }
+    });
+
+    // Clean up rate-limit state when the socket disconnects.
+    socket.on("disconnect", () => {
+      rateLimitMap.delete(socket.id);
     });
   });
 };

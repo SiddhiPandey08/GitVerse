@@ -1,3 +1,7 @@
+// chatControllers.js — HTTP handlers for channels and message history.
+// Talks to: channelModel.js, chatMessageModel.js, utils/repoAccess.js.
+// All routes require authMiddleware (applied in chat.router.js).
+
 import Channel from "../models/channelModel.js";
 import ChatMessage from "../models/chatMessageModel.js";
 import { getRepoAccess } from "../utils/repoAccess.js";
@@ -5,18 +9,24 @@ import { getRepoAccess } from "../utils/repoAccess.js";
 // ---------------------------------------------------------------------------
 // GET /chat/repos/:repoId/channels
 // ---------------------------------------------------------------------------
+// Returns all channels for a repo, guaranteeing that "general" and
+// "collab-requests" always exist so the frontend never gets an empty list.
 export const listChannels = async (req, res) => {
   const access = await getRepoAccess(req.params.repoId, req.user);
   if (!access) return res.status(404).json({ message: "Repository not found" });
 
   const { repo } = access;
 
-  // Guarantee the "general" channel always exists (idempotent upsert).
-  await Channel.findOneAndUpdate(
-    { repo: repo._id, name: "general" },
-    { $setOnInsert: { repo: repo._id, name: "general", createdBy: req.user._id } },
-    { upsert: true, new: true },
-  );
+  // Upsert both default channels — $setOnInsert means we only write on creation,
+  // so calling this endpoint repeatedly is safe and doesn't overwrite anything.
+  const defaultChannels = ["general", "collab-requests"];
+  for (const name of defaultChannels) {
+    await Channel.findOneAndUpdate(
+      { repo: repo._id, name },
+      { $setOnInsert: { repo: repo._id, name, createdBy: req.user._id } },
+      { upsert: true, new: true },
+    );
+  }
 
   const channels = await Channel.find({ repo: repo._id }).sort({ createdAt: 1 });
   return res.json(channels);
