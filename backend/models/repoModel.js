@@ -1,6 +1,8 @@
+// repoModel.js — defines what a Repository looks like in the database.
+// Talks to: userModel.js (owner + collaborators refs), issueModel.js (issues ref).
+
 import mongoose from "mongoose";
 import { Schema } from "mongoose";
-import User from "./userModel.js";
 
 const RepositorySchema = new Schema(
   {
@@ -15,6 +17,7 @@ const RepositorySchema = new Schema(
     content: {
       type: String,
     },
+    // true = public (anyone can see), false = private (owner + collaborators only)
     visibility: {
       type: Boolean,
       default: true,
@@ -32,6 +35,14 @@ const RepositorySchema = new Schema(
       {
         type: Schema.Types.ObjectId,
         ref: "Issue",
+      },
+    ],
+    // Users explicitly granted write access by the owner.
+    // $addToSet in the collaborator endpoints prevents duplicates automatically.
+    collaborators: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
       },
     ],
   },

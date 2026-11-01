@@ -1,3 +1,6 @@
+// RepositoryDetails.jsx — main repository view featuring Code, Issues, Chat, and Collaborators tabs.
+// Talks to: api/repositories.js, RepoFiles.jsx, CommitHistory.jsx, RepoChat.jsx, RepoIssues.jsx, RepoCollaborators.jsx.
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { deleteRepository, toggleStar, toggleVisibility } from "../../api/repositories";
@@ -6,6 +9,8 @@ import CommitHistory from "./CommitHistory";
 import RepoFiles from "./RepoFiles";
 import RepoReadme from "./RepoReadme";
 import RepoChat from "./RepoChat";
+import RepoIssues from "../issue/RepoIssues";
+import RepoCollaborators from "./RepoCollaborators";
 import { VideoCamera } from "@phosphor-icons/react";
 import client from "../../api/client";
 import { Box, Typography, Chip, Button, Snackbar } from "@mui/material";
@@ -29,17 +34,19 @@ export default function RepositoryDetails() {
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
-  const [repoTab, setRepoTab] = useState("code"); // "code" | "chat"
+  const [repoTab, setRepoTab] = useState("code"); // "code" | "issues" | "chat" | "collaborators"
+  
   const displayedRepo = repoOverride || repo;
+  const currentUserId = localStorage.getItem("userId");
   const isOwner =
-    String(displayedRepo?.owner?._id || displayedRepo?.owner) ===
-    localStorage.getItem("userId");
+    displayedRepo?.role === "owner" ||
+    String(displayedRepo?.owner?._id || displayedRepo?.owner) === currentUserId;
 
   useEffect(() => {
     setIsStarred(Boolean(repo?.isStarred || repo?.starred));
   }, [repo]);
 
-  // 2. Toggle Visibility Handler
+  // Toggle repository public / private visibility (owner only).
   const handleToggleVisibility = async () => {
     if (!repo || !activeId) return;
 
@@ -60,17 +67,15 @@ export default function RepositoryDetails() {
     }
   };
 
-  // 3. Updated Star / Unstar Handler
+  // Toggle star / unstar for current user.
   const handleStarToggle = async () => {
     if (!activeId || starring) return;
 
     setStarring(true);
-    // Optimistic UI update
     const previousState = isStarred;
     setIsStarred(!previousState);
 
     try {
-      // Calls PATCH endpoint matching toggle-visibility route pattern
       const response = await toggleStar(activeId);
 
       if (response.data && response.data.updatedRepo) {
@@ -88,11 +93,13 @@ export default function RepositoryDetails() {
       }
     } catch (err) {
       console.error("Error toggling star status:", err.response?.data || err.message);
-      setIsStarred(previousState); // Revert state if backend request fails
+      setIsStarred(previousState);
     } finally {
       setStarring(false);
     }
   };
+
+  // Navigates into the WebRTC video meeting room.
   const handleStartCall = () => {
     client
       .post("/meetings/history", { meeting_code: `repo-${activeId}` })
@@ -100,7 +107,7 @@ export default function RepositoryDetails() {
     navigate(`/meet/repo-${activeId}`);
   };
 
-  // 4. Delete Repository Handler
+  // Deletes repository (owner only).
   const handleDeleteRepo = async () => {
     const confirmDelete = window.confirm(
       `Are you sure you want to delete "${displayedRepo?.name}"? This action cannot be undone.`,
@@ -154,6 +161,13 @@ export default function RepositoryDetails() {
     );
   }
 
+  const tabs = [
+    { id: "code", label: "📁 Code" },
+    { id: "issues", label: "⚠️ Issues" },
+    { id: "chat", label: "💬 Chat" },
+    { id: "collaborators", label: "👥 Collaborators" },
+  ];
+
   return (
     <Box sx={{ minHeight: "100vh", backgroundColor: "#0d1117", color: "#f0f6fc" }}>
       <Navbar />
@@ -167,9 +181,10 @@ export default function RepositoryDetails() {
             justifyContent: "space-between",
             alignItems: "center",
             mb: 3,
+            gap: 2,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
             <Typography
               variant="h6"
               sx={{
@@ -198,23 +213,47 @@ export default function RepositoryDetails() {
                 borderRadius: "12px",
               }}
             />
+
+            {displayedRepo?.role && (
+              <Chip
+                label={displayedRepo.role}
+                size="small"
+                sx={{
+                  height: "22px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  textTransform: "capitalize",
+                  color:
+                    displayedRepo.role === "owner"
+                      ? "#3fb950"
+                      : displayedRepo.role === "collaborator"
+                      ? "#58a6ff"
+                      : "#8b949e",
+                  backgroundColor: "rgba(48, 54, 61, 0.4)",
+                  border: "1px solid #30363d",
+                  borderRadius: "12px",
+                }}
+              />
+            )}
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleStartCall}
-            startIcon={<VideoCamera size={16} />}
-            sx={{
-              color: "#c9d1d9",
-              borderColor: "#30363d",
-              textTransform: "none",
-              backgroundColor: "#21262d",
-              "&:hover": { backgroundColor: "#30363d" },
-            }}
-          >
-            Start call
-          </Button>
-          <Box sx={{ display: "flex", gap: 1 }}>
+
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleStartCall}
+              startIcon={<VideoCamera size={16} />}
+              sx={{
+                color: "#c9d1d9",
+                borderColor: "#30363d",
+                textTransform: "none",
+                backgroundColor: "#21262d",
+                "&:hover": { backgroundColor: "#30363d" },
+              }}
+            >
+              Start call
+            </Button>
+
             <Button
               variant="outlined"
               size="small"
@@ -245,48 +284,51 @@ export default function RepositoryDetails() {
           }}
         >
           <Box>
-            {/* Control Bar */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: { xs: "stretch", sm: "flex-end" },
-                flexWrap: "wrap",
-                gap: 1.5,
-                mb: 2,
-              }}
-            >
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={toggling}
-                onClick={handleToggleVisibility}
-                startIcon={<VisibilityIcon />}
+            {/* Control Bar (Owner operations) */}
+            {isOwner && (
+              <Box
                 sx={{
-                  color: "#c9d1d9",
-                  borderColor: "#30363d",
-                  textTransform: "none",
-                  backgroundColor: "#21262d",
-                  "&:hover": { backgroundColor: "#30363d" },
+                  display: "flex",
+                  justifyContent: { xs: "stretch", sm: "flex-end" },
+                  flexWrap: "wrap",
+                  gap: 1.5,
+                  mb: 2,
                 }}
               >
-                {toggling ? "Updating..." : "Toggle Visibility"}
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                color="error"
-                disabled={deleting}
-                onClick={handleDeleteRepo}
-                startIcon={<DeleteIcon />}
-                sx={{
-                  textTransform: "none",
-                  backgroundColor: "#21262d",
-                  "&:hover": { backgroundColor: "rgba(248,81,73,0.1)" },
-                }}
-              >
-                {deleting ? "Deleting..." : "Delete Repo"}
-              </Button>
-            </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={toggling}
+                  onClick={handleToggleVisibility}
+                  startIcon={<VisibilityIcon />}
+                  sx={{
+                    color: "#c9d1d9",
+                    borderColor: "#30363d",
+                    textTransform: "none",
+                    backgroundColor: "#21262d",
+                    "&:hover": { backgroundColor: "#30363d" },
+                  }}
+                >
+                  {toggling ? "Updating..." : "Toggle Visibility"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                  disabled={deleting}
+                  onClick={handleDeleteRepo}
+                  startIcon={<DeleteIcon />}
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#21262d",
+                    "&:hover": { backgroundColor: "rgba(248,81,73,0.1)" },
+                  }}
+                >
+                  {deleting ? "Deleting..." : "Delete Repo"}
+                </Button>
+              </Box>
+            )}
+
             <Snackbar
               open={Boolean(notice)}
               autoHideDuration={4000}
@@ -295,42 +337,49 @@ export default function RepositoryDetails() {
             />
             {actionError && <ErrorState message={actionError} />}
 
-            {/* Code | Chat tab switch */}
+            {/* Navigation Tabs */}
             <Box
               sx={{
                 display: "flex",
                 borderBottom: "1px solid #30363d",
-                mb: 2,
+                mb: 2.5,
+                gap: 1,
+                overflowX: "auto",
               }}
             >
-              {["code", "chat"].map((tab) => (
+              {tabs.map((tab) => (
                 <Box
-                  key={tab}
-                  onClick={() => setRepoTab(tab)}
+                  key={tab.id}
+                  onClick={() => setRepoTab(tab.id)}
                   sx={{
                     px: 2,
                     py: 1,
                     fontSize: "13px",
                     fontWeight: 600,
-                    textTransform: "capitalize",
                     cursor: "pointer",
-                    color: repoTab === tab ? "#f0f6fc" : "#8b949e",
-                    borderBottom: repoTab === tab ? "2px solid #f78166" : "2px solid transparent",
+                    color: repoTab === tab.id ? "#f0f6fc" : "#8b949e",
+                    borderBottom: repoTab === tab.id ? "2px solid #f78166" : "2px solid transparent",
                     mb: "-1px",
                     transition: "color 0.15s, border-color 0.15s",
                     userSelect: "none",
+                    whiteSpace: "nowrap",
                     "&:hover": { color: "#f0f6fc" },
                   }}
                 >
-                  {tab === "code" ? "\u{1F4C1} Code" : "\u{1F4AC} Chat"}
+                  {tab.label}
                 </Box>
               ))}
             </Box>
 
+            {/* Tab: Code */}
             {repoTab === "code" && (
               <>
                 <RepoFiles repoId={activeId} commitsState={commitsState} />
-                <CommitHistory repoId={activeId} commitsState={commitsState} />
+                <CommitHistory
+                  repoId={activeId}
+                  commitsState={commitsState}
+                  isOwner={isOwner}
+                />
                 <RepoReadme
                   repoId={activeId}
                   name={displayedRepo?.name}
@@ -340,8 +389,23 @@ export default function RepositoryDetails() {
               </>
             )}
 
+            {/* Tab: Issues */}
+            {repoTab === "issues" && (
+              <RepoIssues
+                repoId={activeId}
+                isOwner={isOwner}
+                currentUserId={currentUserId}
+              />
+            )}
+
+            {/* Tab: Chat */}
             {repoTab === "chat" && (
               <RepoChat repoId={activeId} isOwner={isOwner} />
+            )}
+
+            {/* Tab: Collaborators */}
+            {repoTab === "collaborators" && (
+              <RepoCollaborators repoId={activeId} isOwner={isOwner} />
             )}
           </Box>
 

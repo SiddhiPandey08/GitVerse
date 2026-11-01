@@ -1,14 +1,15 @@
+// login.js — CLI controller: authenticates against the API and saves the JWT locally.
+// Now imports getApiUrl from apiConfig.js instead of defining it here, so the
+// server URL is sourced from one canonical place across all CLI controllers.
+
 import fs from "fs";
 import path from "path";
 import axios from "axios";
+import { getApiUrl } from "./apiConfig.js";
 
-const DEFAULT_API_URL = "http://127.0.0.1:3000";
-
-export function getApiUrl() {
-  // 127.0.0.1 instead of localhost avoids IPv6-first resolution stalls on Node 18+
-  return process.env.GITVERSE_API_URL || DEFAULT_API_URL;
-}
-
+// Logs the user in via the GitVerse API and saves the token to .gitV/config.json.
+// Credentials can come from --email/--password flags, GITVERSE_EMAIL/PASSWORD env
+// vars, or an interactive prompt — no AWS credentials or .env needed.
 export async function loginCli({ email, password } = {}) {
   const repoPath = path.resolve(process.cwd(), ".gitV");
   const configPath = path.join(repoPath, "config.json");
@@ -41,7 +42,7 @@ export async function loginCli({ email, password } = {}) {
 
     const { token, userId } = response.data;
 
-    // Merge into existing config.json so `bucket` and `repoId` from `init` survive.
+    // Merge into existing config.json so `repoId` from `init` survives.
     let existingConfig = {};
     if (fs.existsSync(configPath)) {
       existingConfig = JSON.parse(

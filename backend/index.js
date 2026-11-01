@@ -60,13 +60,21 @@ await yargs(hideBin(process.argv))
     "commit <message>",
     "Commit staged files with a message",
     (y) =>
-      y.positional("message", {
-        describe: "Commit message",
-        type: "string",
-      }),
+      y
+        .positional("message", {
+          describe: "Commit message",
+          type: "string",
+        })
+        // --review flags the commit so push.js tells the server to post a
+        // review-request message in #general when it is uploaded.
+        .option("review", {
+          type: "boolean",
+          default: false,
+          describe: "Request a code review when this commit is pushed",
+        }),
     handler(async (argv) => {
       const { commitChanges } = await import("./controllers/commit.js");
-      await commitChanges(argv.message);
+      await commitChanges(argv.message, { review: argv.review });
     }),
   )
   .command(

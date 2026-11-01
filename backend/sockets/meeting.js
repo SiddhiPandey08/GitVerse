@@ -1,28 +1,38 @@
-import mongoose from "mongoose";
-import Repository from "../models/repoModel.js";
+// sockets/meeting.js — WebRTC signalling and in-call chat for video meetings.
+// Talks to: utils/repoAccess.js (access check), no DB writes (all in-memory).
+// Connected to by server.js via registerMeetingSockets(io).
+
+import { getRepoAccess } from "../utils/repoAccess.js";
 
 let connections = {}; // roomId -> [{ socketId, username }]
 let messages = {};
 let timeOnline = {};
 let mediaStatus = {}; // socketId -> { audio, video }
 
+// Decides whether a socket is allowed into a meeting room.
+// Repo rooms are named "repo-<repoId>" — for those, getRepoAccess is the
+// single source of truth (handles private repos and collaborator check).
+// Ad-hoc rooms (any other name) let any logged-in user in.
 const canJoin = async (roomId, user) => {
-  if (!user) return false; // guests are no longer allowed
-  // the client sends the full page URL as the room id, so take the last segment
+  if (!user) return false; // guests are never allowed
   const code = String(roomId).split("?")[0].split("/").pop();
-  if (!code.startsWith("repo-")) return true; // ad-hoc rooms: any logged-in user
+  if (!code.startsWith("repo-")) return true; // ad-hoc room: logged-in user only
   const repoId = code.slice(5);
-  if (!mongoose.isValidObjectId(repoId)) return false;
-  const repo = await Repository.findById(repoId).select("owner visibility");
-  if (!repo) return false;
-  return repo.visibility === true || String(repo.owner) === String(user._id);
+  // getRepoAccess returns null when the user has no access (private repo, not a member).
+  const access = await getRepoAccess(repoId, user);
+  return access !== null;
 };
 
 const registerMeetingSockets = (io) => {
   io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
 
-    socket.on("join-call", async (roomId, username) => {
+    socket.on("join-call", async (roomId) => {
+      // Reject immediately if no user — the socket middleware sets socket.user from JWT.
+      if (!socket.user) {
+        socket.emit("join-denied");
+        return;
+      }
       if (!(await canJoin(roomId, socket.user))) {
         socket.emit("join-denied");
         return;
@@ -30,9 +40,13 @@ const registerMeetingSockets = (io) => {
       if (connections[roomId] === undefined) {
         connections[roomId] = [];
       }
+
+      // Display name always comes from the verified token, never from the client.
+      const displayName = socket.user.username;
+
       connections[roomId].push({
         socketId: socket.id,
-        username: socket.user?.name || username || "Guest",
+        username: displayName,
       });
       timeOnline[socket.id] = new Date();
       mediaStatus[socket.id] = { audio: true, video: true };
@@ -111,7 +125,10 @@ const registerMeetingSockets = (io) => {
       delete mediaStatus[socket.id];
     });
 
-    socket.on("chat-message", (message, sender) => {
+    socket.on("chat-message", (message) => {
+      // sender is always taken from the verified socket.user, never from the client payload.
+      const sender = socket.user?.username ?? "Unknown";
+
       const [matchingRoom, found] = Object.entries(connections).reduce(
         ([room, isFound], [roomId, socketsInRoom]) => {
           if (!isFound && socketsInRoom.some((p) => p.socketId === socket.id)) {

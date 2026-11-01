@@ -1,3 +1,9 @@
+// revert.js — CLI controller: local-only revert that replays local commit
+// history to restore the working directory to a given commit's state.
+// NOTE: this is entirely local — it reads .gitV/commits on disk and never
+// contacts the server.  For a server-side revert (recorded as a new commit
+// visible to collaborators), use POST /repositories/:repoId/commits/:id/revert.
+
 import fs from "fs";
 import path from "path";
 
