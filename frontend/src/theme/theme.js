@@ -13,12 +13,19 @@ const c = {
   mint: "#3DDC97",
   pink: "#FF7AB8",
   violet: "#7C3AED",
+  immersiveBackground: "#05070F",
+  immersiveBackgroundEnd: "#0B1030",
+  immersivePurple: "#8B5CF6",
+  immersiveTeal: "#2DD4BF",
+  immersiveGreen: "#4ADE80",
 };
 
 const hard = (px, color) => `${px}px ${px}px 0 ${color}`;
 
 const ui = "'General Sans', -apple-system, sans-serif";
 const display = "'Sharpie', sans-serif";
+const immersiveDisplay = "'Space Grotesk', 'General Sans', sans-serif";
+const hud = "'JetBrains Mono', 'Fira Code', monospace";
 
 const theme = createTheme({
   palette: {
@@ -43,6 +50,13 @@ const theme = createTheme({
     h5: { fontFamily: ui, fontWeight: 600 },
     h6: { fontFamily: ui, fontWeight: 600 },
     button: { textTransform: "none", fontWeight: 600 },
+    immersive: { fontFamily: immersiveDisplay },
+    hud: { fontFamily: hud, letterSpacing: "0.16em" },
+  },
+  immersive: {
+    background: `linear-gradient(135deg, ${c.immersiveBackground}, ${c.immersiveBackgroundEnd})`,
+    colors: { purple: c.immersivePurple, teal: c.immersiveTeal, green: c.immersiveGreen },
+    text: { primary: "rgba(255,255,255,.9)", secondary: "rgba(255,255,255,.6)" },
   },
   shape: { borderRadius: 8 },
   components: {
