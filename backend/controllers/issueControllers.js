@@ -67,6 +67,11 @@ export const getAllIssues = async (req, res) => {
   const { id } = req.params;
 
   try {
+    const access = await getRepoAccess(id, req.user);
+    if (!access) {
+      return res.status(404).json({ message: "Repository not found" });
+    }
+
     const issues = await Issue.find({ repository: id }).populate(
       "author",
       "username",
@@ -86,6 +91,10 @@ export const getIssueById = async (req, res) => {
     const issue = await Issue.findById(id).populate("author", "username");
     if (!issue) {
       return res.status(404).json({ message: "Issue not found" });
+    }
+    const access = await getRepoAccess(String(issue.repository), req.user);
+    if (!access) {
+      return res.status(404).json({ message: "Repository not found" });
     }
     res.json(issue);
   } catch (error) {

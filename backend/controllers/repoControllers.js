@@ -191,6 +191,14 @@ export const updateRepository = async (req, res) => {
     if (!message) {
       return res.status(400).json({ message: "Commit message is required" });
     }
+    if (
+      reviewRequested &&
+      !req.repo.collaborators.some((id) => String(id) === String(author))
+    ) {
+      return res.status(403).json({
+        message: "Only collaborators can request a review",
+      });
+    }
 
     // Reject any key that doesn't start with "<repoId>/<commitId>/" (or "<repoId>/")
     // — prevents hand-crafted requests from sneaking foreign keys past the push handler.
@@ -309,6 +317,11 @@ export const deleteRepository = async (req, res) => {
 export const getRepoCommits = async (req, res) => {
   const { repoId } = req.params;
   try {
+    const access = await getRepoAccess(repoId, req.user);
+    if (!access) {
+      return res.status(404).json({ message: "Repository not found" });
+    }
+
     const commits = await Commit.find({ repository: repoId })
       .sort({ createdAt: 1 }) // oldest first, matching commit order
       .populate("author", "username")
@@ -336,6 +349,11 @@ export const getRepoFile = async (req, res) => {
   }
 
   try {
+    const access = await getRepoAccess(repoId, req.user);
+    if (!access) {
+      return res.status(404).json({ message: "Repository not found" });
+    }
+
     // ...and must be a file that one of this repo's commits actually registered.
     const registered = await Commit.exists({ repository: repoId, files: key });
     if (!registered) {
