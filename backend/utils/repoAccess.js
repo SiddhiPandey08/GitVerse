@@ -5,6 +5,9 @@
 import mongoose from "mongoose";
 import Repository from "../models/repoModel.js";
 
+export const sameId = (a, b) =>
+  String(a?._id ?? a) === String(b?._id ?? b);
+
 /**
  * Resolves what role a user has on a repository.
  *
@@ -31,11 +34,11 @@ export async function getRepoAccess(repoId, user) {
   );
   if (!repo) return null;
 
-  const isOwner = String(repo.owner) === String(user._id);
+  const isOwner = sameId(repo.owner, user._id);
   // collaborators is an array of ObjectIds — compare as strings to be safe.
   const isCollaborator =
     !isOwner &&
-    repo.collaborators.some((id) => String(id) === String(user._id));
+    repo.collaborators.some((id) => sameId(id, user._id));
 
   // Private repos are visible only to owner and collaborators.
   if (repo.visibility === false && !isOwner && !isCollaborator) return null;

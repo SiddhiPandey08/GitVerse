@@ -39,10 +39,10 @@ repoRouter.post("/create", authMiddleware, createRepository);
 // getAllRepositories now requires auth — it filters results by what the caller can see.
 repoRouter.get("/all", authMiddleware, getAllRepositories);
 
+repoRouter.get("/user/:currUserId", authMiddleware, getRepositoriesForCurrUser);
 repoRouter.get("/:repoId", authMiddleware, getRepositoryById);
-repoRouter.get("/name/:repoName", getRepositoryByName);
-repoRouter.get("/owner/:repoOwner", getRepositoryByOwner);
-repoRouter.get("/user/:currUserId", getRepositoriesForCurrUser);
+repoRouter.get("/name/:repoName", authMiddleware, getRepositoryByName);
+repoRouter.get("/owner/:repoOwner", authMiddleware, getRepositoryByOwner);
 
 // Push route: owner OR collaborator can push (authorizeRepoWriter).
 repoRouter.put(

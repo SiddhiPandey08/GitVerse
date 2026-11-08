@@ -5,7 +5,7 @@ import "./dashboard.css";
 import Navbar from "../navbar/Navbar";
 import {
   getAllRepositories,
-  getRepositoriesByOwner,
+  getRepositoriesForUser,
 } from "../../api/repositories";
 
 export default function Dashboard() {
@@ -30,7 +30,7 @@ export default function Dashboard() {
         return;
       }
       try {
-        const { data } = await getRepositoriesByOwner(repoOwner);
+        const { data } = await getRepositoriesForUser(repoOwner);
         setRepositories(data.repositories || []);
       } catch (err) {
         console.error("Error fetching repositories:", err);
@@ -180,6 +180,11 @@ export default function Dashboard() {
                         <span className="badge-visibility">
                           {repo.visibility ? "Public" : "Private"}
                         </span>
+                        {repo.role && (
+                          <span className="badge-visibility">
+                            {repo.role === "owner" ? "Owner" : "Collaborator"}
+                          </span>
+                        )}
                       </div>
 
                       {repo.description && (

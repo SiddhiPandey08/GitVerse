@@ -49,8 +49,15 @@ characterAssets.forEach(([path, url]) => {
 const charKeys = Object.keys(charMap);
 
 // Exact lookup. A missing file shows an initial instead of a wrong face.
-const pickChar = (name) => charMap[name.toLowerCase()] ?? null;
+const CANONICAL = ["owner", "collaborator", "viewer", "member", "owner2", "viewer2"];
 
+// scenes ask for "reviewer"; use the "member" portrait for it
+const ALIASES = { reviewer: "member" };
+const pickChar = (name, fallback = 0) =>
+  charMap[name] ??
+  charMap[ALIASES[name]] ??
+  charMap[charKeys[fallback % Math.max(charKeys.length, 1)]] ??
+  null;
 // Portraits shown around the preloader (the full-length figure is left out).
 const PRELOAD_PREFERRED = [
   "owner",
@@ -92,14 +99,11 @@ const EXIT = 0.8;
 const CLI = "gitv";
 
 const CLI_LINES = [
-  { cmd: `${CLI} login`, out: "Signed in" },
-  { cmd: `${CLI} init 6650f2a1`, out: "Linked this folder to your repository" },
-  { cmd: `${CLI} add .` },
-  {
-    cmd: `${CLI} commit -m "Fix login route" --review`,
-    out: "Saved 1 commit, review requested",
-  },
-  { cmd: `${CLI} push`, out: "Pushed 1 commit to GitVerse" },
+  { cmd: `${CLI} init 6ab14c22`, out: "Repository initialized and linked." },
+  { cmd: `${CLI} login`, out: "Logged in successfully." },
+  { cmd: `${CLI} add README.md`, out: "File added to staging." },
+  { cmd: `${CLI} commit "Add roles and issues"`, out: "Commit created (1 file)" },
+  { cmd: `${CLI} push`, out: "Pushed 1 commit(s)." },
 ];
 
 const CLI_COMMANDS = [

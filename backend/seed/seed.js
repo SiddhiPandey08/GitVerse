@@ -12,14 +12,13 @@
 // ASSUMPTIONS (check against your code, each one is a one-line change):
 //  1. ES modules ("type": "module") and these model paths/default exports.
 //  2. Users live in a "users" collection with username, email, password,
-//     repositories, followedUsers, starRepos (you use the raw driver for users).
+//     repositories, followedUsers, starredRepositories (you use the raw driver for users).
 //     If userControllers.js calls client.db("someName"), set USERS_DB_NAME=someName.
 //  3. Repository: name, description, content (String), visibility (Boolean), owner, issues.
 //     Issue: title, description, status ("open"/"closed"), repository.
 //     Commit: author, message, repository, files, createdAt (from your notes).
 //  4. Commit.author holds the user's _id. If you store the username instead, edit authorField().
 
-import "dotenv/config";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import mongoose from "mongoose";
@@ -538,7 +537,7 @@ async function reset() {
     {
       $pull: {
         repositories: { $in: repoIds },
-        starRepos: { $in: repoIds },
+        starredRepositories: { $in: repoIds },
         followedUsers: { $in: seedUserIds },
       },
     },
@@ -572,7 +571,7 @@ async function seed() {
       password: passwordHash,
       repositories: [],
       followedUsers: [],
-      starRepos: [],
+      starredRepositories: [],
     };
     const { insertedId } = await usersCol.insertOne(doc);
     users[key] = { ...doc, _id: insertedId };
@@ -657,7 +656,7 @@ async function seed() {
     {
       $addToSet: {
         followedUsers: { $each: [users.arjun._id, users.maya._id] },
-        starRepos: {
+        starredRepositories: {
           $each: [
             repoIds["campus-connect"],
             repoIds["quantum-sandbox"],
@@ -672,7 +671,7 @@ async function seed() {
     {
       $addToSet: {
         followedUsers: users.you._id,
-        starRepos: repoIds["sojourn"],
+        starredRepositories: repoIds["sojourn"],
       },
     },
   );
@@ -680,7 +679,7 @@ async function seed() {
     { _id: users.maya._id },
     {
       $addToSet: {
-        starRepos: { $each: [repoIds["meridian"], repoIds["dsa-java"]] },
+        starredRepositories: { $each: [repoIds["meridian"], repoIds["dsa-java"]] },
       },
     },
   );

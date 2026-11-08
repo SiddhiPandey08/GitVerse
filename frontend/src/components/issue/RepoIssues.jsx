@@ -2,6 +2,7 @@
 // Supports creating issues, flagging collaboration requests, and owner approval.
 // Talks to: api/issues.js (getRepoIssues, createIssue, updateIssue, deleteIssue, grantCollaborator).
 
+import { Link } from "react-router-dom";
 import { useState, useEffect, useCallback } from "react";
 import {
   Box,
@@ -432,7 +433,15 @@ export default function RepoIssues({ repoId, isOwner = false, currentUserId }) {
                 </Typography>
 
                 <Typography sx={{ fontSize: "12px", color: "#8b949e" }}>
-                  opened by {issue.author?.username || "Unknown"} {timeAgo(issue.createdAt)}
+                  opened by{" "}
+                  {issue.author?._id ? (
+                    <Link to={`/users/${issue.author._id}`}>
+                      {issue.author.username}
+                    </Link>
+                  ) : (
+                    "Unknown"
+                  )}{" "}
+                  {timeAgo(issue.createdAt)}
                 </Typography>
               </Box>
 
@@ -513,4 +522,3 @@ export default function RepoIssues({ repoId, isOwner = false, currentUserId }) {
     </Paper>
   );
 }
-

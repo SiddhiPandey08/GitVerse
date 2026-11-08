@@ -11,7 +11,7 @@ import Issue from "../models/issueModel.js";
 import Commit from "../models/commitModel.js";
 import Channel from "../models/channelModel.js";
 import { s3, S3_BUCKET } from "../config/aws-config.js";
-import { getRepoAccess } from "../utils/repoAccess.js";
+import { getRepoAccess, sameId } from "../utils/repoAccess.js";
 import { postChannelMessage } from "../utils/chatHelpers.js";
 
 export const createRepository = async (req, res) => {
@@ -102,9 +102,15 @@ export const getRepositoryByName = async (req, res) => {
   const { repoName } = req.params;
 
   try {
-    const result = await Repository.find({ name: repoName })
+    const repositories = await Repository.find({ name: repoName })
       .populate("owner", "-password")
       .populate("issues");
+    const result = [];
+    for (const repository of repositories) {
+      if (await getRepoAccess(repository._id, req.user)) {
+        result.push(repository);
+      }
+    }
     if (result.length === 0) {
       return res.status(404).json({
         message: "Repository not found",
@@ -122,14 +128,20 @@ export const getRepositoryByOwner = async (req, res) => {
     const repositories = await Repository.find({ owner: repoOwner })
       .populate("owner", "-password")
       .populate("issues");
+    const visibleRepositories = [];
+    for (const repository of repositories) {
+      if (await getRepoAccess(repository._id, req.user)) {
+        visibleRepositories.push(repository);
+      }
+    }
 
-    if (repositories.length === 0) {
+    if (visibleRepositories.length === 0) {
       return res.status(404).json({
         message: "Repository not found",
       });
     }
     res.status(200).json({
-      repositories,
+      repositories: visibleRepositories,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -143,14 +155,18 @@ export const getRepositoryByOwner = async (req, res) => {
 export const getRepositoriesForCurrUser = async (req, res) => {
   const { currUserId } = req.params;
   try {
+    if (!sameId(currUserId, req.user._id)) {
+      return res.status(403).json({ message: "You can only list your own repositories" });
+    }
+
     // Fetch owned repos and collaborator repos in parallel for speed.
     const [ownedRepos, collabRepos] = await Promise.all([
       Repository.find({ owner: currUserId })
         .populate("issues")
-        .populate("content"),
+        .populate("owner", "-password"),
       Repository.find({ collaborators: currUserId })
         .populate("issues")
-        .populate("content"),
+        .populate("owner", "-password"),
     ]);
 
     if (ownedRepos.length === 0 && collabRepos.length === 0) {
@@ -190,6 +206,14 @@ export const updateRepository = async (req, res) => {
   try {
     if (!message) {
       return res.status(400).json({ message: "Commit message is required" });
+    }
+    if (
+      reviewRequested &&
+      !req.repo.collaborators.some((id) => sameId(id, author))
+    ) {
+      return res.status(403).json({
+        message: "Only collaborators can request a review",
+      });
     }
 
     // Reject any key that doesn't start with "<repoId>/<commitId>/" (or "<repoId>/")
@@ -309,6 +333,11 @@ export const deleteRepository = async (req, res) => {
 export const getRepoCommits = async (req, res) => {
   const { repoId } = req.params;
   try {
+    const access = await getRepoAccess(repoId, req.user);
+    if (!access) {
+      return res.status(404).json({ message: "Repository not found" });
+    }
+
     const commits = await Commit.find({ repository: repoId })
       .sort({ createdAt: 1 }) // oldest first, matching commit order
       .populate("author", "username")
@@ -336,6 +365,11 @@ export const getRepoFile = async (req, res) => {
   }
 
   try {
+    const access = await getRepoAccess(repoId, req.user);
+    if (!access) {
+      return res.status(404).json({ message: "Repository not found" });
+    }
+
     // ...and must be a file that one of this repo's commits actually registered.
     const registered = await Commit.exists({ repository: repoId, files: key });
     if (!registered) {
@@ -662,7 +696,7 @@ export const addCollaborator = async (req, res) => {
     }
 
     // The owner doesn't need to be in the collaborators list — they already own it.
-    if (String(repo.owner) === String(targetUser._id)) {
+    if (sameId(repo.owner, targetUser._id)) {
       return res
         .status(400)
         .json({ message: "Cannot add the repository owner as a collaborator" });
@@ -719,12 +753,12 @@ export const removeCollaborator = async (req, res) => {
         for (const sock of sockets) {
           if (
             sock.data?.user &&
-            String(sock.data.user._id) === String(targetUser._id)
+            sameId(sock.data.user._id, targetUser._id)
           ) {
             sock.leave(room);
           } else if (
             sock.user &&
-            String(sock.user._id) === String(targetUser._id)
+            sameId(sock.user._id, targetUser._id)
           ) {
             // socket.user is set directly on the socket object in server.js
             sock.leave(room);

@@ -2,7 +2,7 @@
 // Talks to: repoModel.js (ownership check), utils/repoAccess.js (writer check).
 
 import Repository from "../models/repoModel.js";
-import { getRepoAccess } from "../utils/repoAccess.js";
+import { getRepoAccess, sameId } from "../utils/repoAccess.js";
 
 // Confirms the authenticated user is the OWNER of the repo in :repoId.
 // Used on delete, toggle-visibility, and collaborator-management routes
@@ -16,7 +16,7 @@ export const authorizeRepoOwner = async (req, res, next) => {
       return res.status(404).json({ message: "Repository not found" });
     }
 
-    if (repo.owner.toString() !== req.user._id.toString()) {
+    if (!sameId(repo.owner, req.user._id)) {
       return res
         .status(403)
         .json({
