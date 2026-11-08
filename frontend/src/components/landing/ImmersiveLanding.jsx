@@ -49,8 +49,15 @@ characterAssets.forEach(([path, url]) => {
 const charKeys = Object.keys(charMap);
 
 // Exact lookup. A missing file shows an initial instead of a wrong face.
-const pickChar = (name) => charMap[name.toLowerCase()] ?? null;
+const CANONICAL = ["owner", "collaborator", "viewer", "member", "owner2", "viewer2"];
 
+// scenes ask for "reviewer"; use the "member" portrait for it
+const ALIASES = { reviewer: "member" };
+const pickChar = (name, fallback = 0) =>
+  charMap[name] ??
+  charMap[ALIASES[name]] ??
+  charMap[charKeys[fallback % Math.max(charKeys.length, 1)]] ??
+  null;
 // Portraits shown around the preloader (the full-length figure is left out).
 const PRELOAD_PREFERRED = [
   "owner",
