@@ -11,7 +11,7 @@ import StarredRepos from "./components/repo/StarredRepos";
 import CreateRepository from "./components/repo/CreateRepository";
 import NotFound from "./components/common/NotFound";
 import RequireAuth from "./components/common/RequireAuth";
-import Landing from "./components/landing/Landing";
+import Landing from "./components/landing/ImmersiveLanding";
 import VideoMeet from "./features/meeting/VideoMeet";
 // Auth Context
 import { useAuth } from "./authContext";
