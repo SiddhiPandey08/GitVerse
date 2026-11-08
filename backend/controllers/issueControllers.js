@@ -24,14 +24,39 @@ export const createIssue = async (req, res) => {
       return res.status(404).json({ message: "Repository not found" });
     }
 
+    if (
+      requestCollaboration &&
+      (await Issue.exists({
+        repository,
+        author: req.user._id,
+        requestCollaboration: true,
+        status: "pending",
+      }))
+    ) {
+      return res.status(409).json({
+        message: "You already have a pending collaboration request for this repository",
+      });
+    }
+
     const newIssue = new Issue({
       repository,
       title,
       description,
       author: req.user._id, // always from the verified JWT
       requestCollaboration: Boolean(requestCollaboration),
+      status: requestCollaboration ? "pending" : "open",
     });
-    const result = await newIssue.save();
+    let result;
+    try {
+      result = await newIssue.save();
+    } catch (error) {
+      if (error.code === 11000 && requestCollaboration) {
+        return res.status(409).json({
+          message: "You already have a pending collaboration request for this repository",
+        });
+      }
+      throw error;
+    }
 
     // Post an automated message to #collab-requests so the team can see new issues.
     // We get the io instance from app.set("io", io) in server.js.
@@ -120,6 +145,25 @@ export const updateIssueById = async (req, res) => {
       return res.status(404).json({ message: "Repository not found" });
     }
 
+    if (
+      issue.requestCollaboration &&
+      status !== undefined &&
+      status !== issue.status
+    ) {
+      return res.status(400).json({
+        message: "Use the collaboration request approval or rejection endpoint to change its status",
+      });
+    }
+    if (
+      !issue.requestCollaboration &&
+      status !== undefined &&
+      !["open", "closed"].includes(status)
+    ) {
+      return res.status(400).json({
+        message: "Regular issues may only be open or closed",
+      });
+    }
+
     const isIssueAuthor = sameId(issue.author, req.user._id);
     if (!access.isOwner && !isIssueAuthor) {
       return res
@@ -168,7 +212,7 @@ export const deleteIssueById = async (req, res) => {
 };
 
 // Grants collaborator access to the user who opened a "request collaboration" issue.
-// Only the repo owner can call this. The issue must have requestCollaboration=true.
+// Only the repo owner can call this. The issue must be a pending collaboration request.
 // Uses $addToSet so adding the same person twice is safe.
 export const grantCollaborator = async (req, res) => {
   const { id } = req.params; // issue id
@@ -191,6 +235,11 @@ export const grantCollaborator = async (req, res) => {
         .status(400)
         .json({ message: "This issue is not a collaboration request" });
     }
+    if (issue.status !== "pending") {
+      return res.status(409).json({
+        message: "This collaboration request has already been handled",
+      });
+    }
 
     // Add the issue author to collaborators (idempotent: $addToSet won't duplicate).
     const repo = await Repository.findByIdAndUpdate(
@@ -199,8 +248,7 @@ export const grantCollaborator = async (req, res) => {
       { new: true },
     );
 
-    // Close the issue now that it's been handled.
-    issue.status = "closed";
+    issue.status = "approved";
     await issue.save();
 
     // Announce the grant in #collab-requests.
@@ -212,7 +260,7 @@ export const grantCollaborator = async (req, res) => {
           String(issue.repository),
           "collab-requests",
           req.user._id,
-          `${req.user.username} granted ${issue.author.username} collaborator access`,
+          `${req.user.username} approved ${issue.author.username}'s collaboration request`,
           req.user.username,
         );
       }
@@ -224,6 +272,89 @@ export const grantCollaborator = async (req, res) => {
       message: `${issue.author.username} is now a collaborator`,
       repo,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Rejects a pending collaboration request. Only the repository owner may do so.
+export const rejectCollaborationRequest = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const issue = await Issue.findById(id).populate("author", "username");
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
+    const access = await getRepoAccess(String(issue.repository), req.user);
+    if (!access || !access.isOwner) {
+      return res.status(403).json({
+        message: "Only the repository owner can reject collaboration requests",
+      });
+    }
+    if (!issue.requestCollaboration) {
+      return res.status(400).json({
+        message: "This issue is not a collaboration request",
+      });
+    }
+    if (issue.status !== "pending") {
+      return res.status(409).json({
+        message: "This collaboration request has already been handled",
+      });
+    }
+
+    issue.status = "rejected";
+    await issue.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      await postChannelMessage(
+        io,
+        String(issue.repository),
+        "collab-requests",
+        req.user._id,
+        `${req.user.username} rejected ${issue.author.username}'s collaboration request`,
+        req.user.username,
+      );
+    }
+
+    res.json({ message: "Collaboration request rejected", issue });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Lists collaboration requests for a repository. The repository owner only.
+export const listCollaborationRequests = async (req, res) => {
+  const { repoId } = req.params;
+  const { status } = req.query;
+  const validStatuses = ["pending", "approved", "rejected"];
+
+  if (status && !validStatuses.includes(status)) {
+    return res.status(400).json({
+      message: "status must be pending, approved, or rejected",
+    });
+  }
+
+  try {
+    const access = await getRepoAccess(repoId, req.user);
+    if (!access || !access.isOwner) {
+      return res.status(403).json({
+        message: "Only the repository owner can list collaboration requests",
+      });
+    }
+
+    const filter = {
+      repository: repoId,
+      requestCollaboration: true,
+    };
+    if (status) filter.status = status;
+
+    const requests = await Issue.find(filter)
+      .sort({ createdAt: -1 })
+      .populate("author", "username");
+    res.json(requests);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

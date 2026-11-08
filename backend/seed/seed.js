@@ -15,7 +15,7 @@
 //     repositories, followedUsers, starredRepositories (you use the raw driver for users).
 //     If userControllers.js calls client.db("someName"), set USERS_DB_NAME=someName.
 //  3. Repository: name, description, content (String), visibility (Boolean), owner, issues.
-//     Issue: title, description, status ("open"/"closed"), repository.
+//     Issue: title, description, status ("open"/"closed"/"pending"/"approved"/"rejected"), repository.
 //     Commit: author, message, repository, files, createdAt (from your notes).
 //  4. Commit.author holds the user's _id. If you store the username instead, edit authorField().
 
@@ -25,6 +25,9 @@ import mongoose from "mongoose";
 import Repository from "../models/repoModel.js";
 import Issue from "../models/issueModel.js";
 import Commit from "../models/commitModel.js";
+import Channel from "../models/channelModel.js";
+import ChatMessage from "../models/chatMessageModel.js";
+import Meeting from "../models/meetingModel.js";
 
 const { ObjectId } = mongoose.Types;
 const MANIFEST = fileURLToPath(new URL("./.seeded.json", import.meta.url));
@@ -529,6 +532,17 @@ async function reset() {
   repoIds.push(...owned.map((r) => r._id));
 
   for (const id of repoIds) await s3.purge(`${id}/`);
+  const seededMeetings = await Meeting.find({ repoId: { $in: repoIds } }).select(
+    "messageId",
+  );
+  await ChatMessage.deleteMany({
+    $or: [
+      { channel: { $in: await Channel.find({ repo: { $in: repoIds } }).distinct("_id") } },
+      { _id: { $in: seededMeetings.map((meeting) => meeting.messageId).filter(Boolean) } },
+    ],
+  });
+  await Channel.deleteMany({ repo: { $in: repoIds } });
+  await Meeting.deleteMany({ repoId: { $in: repoIds } });
   await Commit.deleteMany({ repository: { $in: repoIds } });
   await Issue.deleteMany({ repository: { $in: repoIds } });
   await Repository.deleteMany({ _id: { $in: repoIds } });
@@ -595,6 +609,7 @@ async function seed() {
           description: `Steps to reproduce and expected behaviour for: ${title}.`,
           status,
           repository: repoId,
+          author: owner._id,
           createdAt: at,
           updatedAt: at,
         };
@@ -607,8 +622,10 @@ async function seed() {
           name: r.name,
           description: r.desc,
           content: "",
-          visibility: true,
+          visibility: r.name !== "meridian",
           owner: owner._id,
+          collaborators:
+            r.name === "meridian" ? [users.maya._id] : [],
           issues: issues.map((i) => i._id),
           createdAt,
           updatedAt: createdAt,
@@ -648,6 +665,83 @@ async function seed() {
       { _id: owner._id },
       { $addToSet: { repositories: repoId } },
     );
+  }
+
+  const requestRepoId = repoIds["notemind"];
+  const requests = [
+    ["pending", users.maya._id],
+    ["approved", users.arjun._id],
+    ["rejected", users.kabir._id],
+  ].map(([status, author], index) => ({
+    _id: new ObjectId(),
+    title: `Request collaboration: ${status}`,
+    description: `Seeded ${status} collaboration request.`,
+    status,
+    repository: requestRepoId,
+    author,
+    requestCollaboration: true,
+    createdAt: daysAgo(index + 1),
+    updatedAt: daysAgo(index + 1),
+  }));
+  await Issue.insertMany(requests);
+  await Repository.findByIdAndUpdate(requestRepoId, {
+    $push: { issues: { $each: requests.map((request) => request._id) } },
+  });
+  await Repository.findByIdAndUpdate(requestRepoId, {
+    $addToSet: { collaborators: users.arjun._id },
+  });
+
+  const channelNames = ["general", "collab-requests", "meetings"];
+  for (const repoId of Object.values(repoIds)) {
+    await Channel.insertMany(
+      channelNames.map((name) => ({
+        repo: repoId,
+        name,
+        createdBy: users.you._id,
+      })),
+    );
+  }
+
+  const meetingsChannel = await Channel.findOne({
+    repo: requestRepoId,
+    name: "meetings",
+  });
+  const meetingSeeds = [
+    {
+      title: "Seed planning meeting",
+      scheduledFor: new Date(Date.now() + 3 * 864e5),
+      status: "scheduled",
+      createdBy: users.you._id,
+    },
+    {
+      title: "Seed retrospective meeting",
+      scheduledFor: new Date(Date.now() - 3 * 864e5),
+      status: "ended",
+      createdBy: users.maya._id,
+    },
+  ];
+  for (const seedMeeting of meetingSeeds) {
+    const meeting = await Meeting.create({
+      repoId: requestRepoId,
+      user: seedMeeting.createdBy,
+      ...seedMeeting,
+    });
+    meeting.roomId = `repo-${requestRepoId}-${meeting._id}`;
+    const card = await ChatMessage.create({
+      channel: meetingsChannel._id,
+      sender: seedMeeting.createdBy,
+      text: seedMeeting.title,
+      type: "meeting",
+      metadata: {
+        meetingId: meeting._id,
+        title: meeting.title,
+        scheduledFor: meeting.scheduledFor,
+        status: meeting.status,
+        roomId: meeting.roomId,
+      },
+    });
+    meeting.messageId = card._id;
+    await meeting.save();
   }
 
   // Follows and stars so the Starred page and suggestions have something to show

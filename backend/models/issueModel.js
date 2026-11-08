@@ -16,7 +16,7 @@ const IssueSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["open", "closed"],
+      enum: ["open", "closed", "pending", "approved", "rejected"],
       default: "open",
     },
     repository: {
@@ -38,6 +38,17 @@ const IssueSchema = new Schema(
     },
   },
   { timestamps: true },
+);
+
+IssueSchema.index(
+  { repository: 1, author: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      requestCollaboration: true,
+      status: "pending",
+    },
+  },
 );
 
 const Issue = mongoose.model("Issue", IssueSchema);

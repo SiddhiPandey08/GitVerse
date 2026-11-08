@@ -39,7 +39,7 @@ graph TD
 - `backend/controllers/repoControllers.js`: Repository logic, S3 URL signing, review stamp, revert diffing, and collaborator management.
 - `backend/controllers/userControllers.js`: MongoDB native client queries for user registration, bcrypt auth, and profiles.
 - `backend/controllers/issueControllers.js`: Issue creation, collaboration requests, and automated `#collab-requests` notifications.
-- `backend/controllers/chatControllers.js`: Auto-creates `#general` & `#collab-requests` channels and fetches message history.
+- `backend/controllers/chatControllers.js`: Auto-creates `#general`, `#collab-requests`, and `#meetings` channels and fetches typed message history.
 - `backend/controllers/meetingControllers.js`: Saves and retrieves call session history in `Meeting`.
 - `backend/controllers/activityController.js`: Aggregates repository, issue, and commit timestamps for profile activity graphs.
 - `backend/models/userModel.js`: Mongoose schema for user accounts, repositories, and follow links.
@@ -56,6 +56,75 @@ graph TD
 - `backend/sockets/channels.js`: Socket handlers for channel join, leave, rate limiting, and real-time message broadcasting.
 - `backend/sockets/meeting.js`: Socket handlers for WebRTC mesh signaling (`signal`, `join-call`, `media-status`).
 - `backend/config/aws-config.js`: Server-only AWS S3 client configuration.
+
+### Task 3 chat and meeting-channel flow
+
+- Repository creation and channel discovery ensure `#general`, `#collab-requests`, and `#meetings`.
+- `ChatMessage.type` is `user` or `meeting`; `metadata` stores optional structured meeting-card data.
+- `channel:message` persists and broadcasts both fields. `channel:message-update` persists metadata changes and broadcasts `message-updated`.
+- Meeting rooms accept `repo-<repoId>` and `repo-<repoId>-<meetingId>`; the first repository ID is used for access checks.
+
+### Task 5 activity flow
+
+- `GET /activity/:userId` requires authentication and counts that user's repository, issue, and commit activity only in repositories visible to the requester.
+- Visible repositories include public repositories plus private repositories owned by or shared with the requester, so collaborator activity is included without leaking private data.
+- `GET /activity/repo/:repoId` requires repository access and returns repository, issue, and commit activity using `YYYY/MM/DD` dates.
+
+### Task 4 scheduled meeting flow
+
+- Owners and collaborators schedule future meetings with `POST /repositories/:repoId/meetings/schedule`.
+- Anyone with repository access can read upcoming meetings. The creator or owner can cancel; owners and collaborators can start.
+- Scheduled meetings use `repo-<repoId>-<meetingId>`. Instant meetings use `repo-<repoId>`.
+- Each scheduled or instant meeting creates one `meeting` card in `#meetings`; start/cancel updates its metadata and emits `message-updated`.
+
+## Final REST endpoint and role matrix
+
+`Public` means no login is required. `Authenticated` means any logged-in user; `Viewer` means public-repository access or membership in a private repository.
+
+| Method | Path | Required role |
+|---|---|---|
+| GET | `/users/` | Authenticated |
+| POST | `/users/signup` | Public |
+| POST | `/users/login` | Public |
+| GET | `/users/userProfile/:id` | Authenticated |
+| PUT | `/users/updateProfile/:id` | Profile owner |
+| DELETE | `/users/deleteUser/:id` | Profile owner |
+| POST | `/repositories/create` | Authenticated |
+| GET | `/repositories/all` | Authenticated |
+| GET | `/repositories/user/:currUserId` | Authenticated |
+| GET | `/repositories/:repoId` | Viewer |
+| GET | `/repositories/name/:repoName` | Viewer |
+| GET | `/repositories/owner/:repoOwner` | Authenticated |
+| PUT | `/repositories/update/:repoId` | Owner or collaborator |
+| PATCH | `/repositories/toggle-visibility/:repoId` | Owner |
+| PATCH | `/repositories/toggle-star/:repoId` | Authenticated |
+| DELETE | `/repositories/delete/:repoId` | Owner |
+| GET | `/repositories/:repoId/file` | Viewer |
+| GET | `/repositories/:repoId/commits` | Viewer |
+| POST | `/repositories/:repoId/upload-urls` | Owner or collaborator |
+| POST | `/repositories/:repoId/download-urls` | Viewer |
+| PATCH | `/repositories/:repoId/commits/:commitId/reviewed` | Owner |
+| POST | `/repositories/:repoId/commits/:commitId/revert` | Owner |
+| GET/POST/DELETE | `/repositories/:repoId/collaborators...` | Owner |
+| GET | `/repositories/:repoId/collab-requests` | Owner |
+| POST | `/repositories/:repoId/meetings/schedule` | Owner or collaborator |
+| GET | `/repositories/:repoId/meetings/upcoming` | Viewer |
+| PATCH | `/repositories/:repoId/meetings/:meetingId/cancel` | Meeting creator or owner |
+| POST | `/repositories/:repoId/meetings/start` | Owner or collaborator |
+| POST | `/issues/create` | Authenticated |
+| GET | `/issues/repo/:id` | Viewer |
+| GET | `/issues/:id` | Viewer |
+| PUT | `/issues/update/:id` | Authenticated |
+| DELETE | `/issues/delete/:id` | Authenticated |
+| POST | `/issues/:id/grant-collaborator` | Repository owner |
+| POST | `/issues/:id/reject` | Repository owner |
+| GET | `/chat/repos/:repoId/channels` | Viewer |
+| POST | `/chat/repos/:repoId/channels` | Viewer |
+| GET | `/chat/channels/:channelId/messages` | Viewer |
+| GET | `/activity/:userId` | Authenticated |
+| GET | `/activity/repo/:repoId` | Viewer |
+| GET/POST | `/meetings/history` | Authenticated |
+| GET | `/meetings/me` | Authenticated |
 
 ### CLI Controllers
 - `backend/controllers/apiConfig.js`: Sourced API base URL from `GITV_API_URL` or `http://127.0.0.1:3000`.
@@ -412,4 +481,3 @@ sequenceDiagram
 10. **Add automated bot channel notifications**:
     - Helper utility: `backend/utils/chatHelpers.js` (`postChannelMessage`)
     - Trigger points: `backend/controllers/issueControllers.js`, `backend/controllers/repoControllers.js`
-

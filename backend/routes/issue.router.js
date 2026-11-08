@@ -8,6 +8,7 @@ import {
   updateIssueById,
   deleteIssueById,
   grantCollaborator,
+  rejectCollaborationRequest,
 } from "../controllers/issueControllers.js";
 
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -28,5 +29,6 @@ issueRouter.delete("/delete/:id", deleteIssueById);
 // Repo owner calls this to approve a collaboration request and add the
 // issue's author to the repo's collaborators list.
 issueRouter.post("/:id/grant-collaborator", grantCollaborator);
+issueRouter.post("/:id/reject", rejectCollaborationRequest);
 
 export default issueRouter;
