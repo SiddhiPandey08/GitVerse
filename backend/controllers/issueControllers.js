@@ -4,7 +4,7 @@
 
 import Issue from "../models/issueModel.js";
 import Repository from "../models/repoModel.js";
-import { getRepoAccess } from "../utils/repoAccess.js";
+import { getRepoAccess, sameId } from "../utils/repoAccess.js";
 import { postChannelMessage } from "../utils/chatHelpers.js";
 
 // Creates a new issue on a repo.
@@ -120,7 +120,7 @@ export const updateIssueById = async (req, res) => {
       return res.status(404).json({ message: "Repository not found" });
     }
 
-    const isIssueAuthor = String(issue.author) === String(req.user._id);
+    const isIssueAuthor = sameId(issue.author, req.user._id);
     if (!access.isOwner && !isIssueAuthor) {
       return res
         .status(403)
@@ -153,7 +153,7 @@ export const deleteIssueById = async (req, res) => {
       return res.status(404).json({ message: "Repository not found" });
     }
 
-    const isIssueAuthor = String(issue.author) === String(req.user._id);
+    const isIssueAuthor = sameId(issue.author, req.user._id);
     if (!access.isOwner && !isIssueAuthor) {
       return res
         .status(403)
