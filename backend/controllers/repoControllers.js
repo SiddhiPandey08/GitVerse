@@ -37,6 +37,22 @@ export const createRepository = async (req, res) => {
 
     const result = await newRepo.save();
 
+    await Channel.bulkWrite(
+      ["general", "collab-requests", "meetings"].map((name) => ({
+        updateOne: {
+          filter: { repo: result._id, name },
+          update: {
+            $setOnInsert: {
+              repo: result._id,
+              name,
+              createdBy: owner,
+            },
+          },
+          upsert: true,
+        },
+      })),
+    );
+
     await Commit.create({
       author: owner,
       message: "Initial commit",

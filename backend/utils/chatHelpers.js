@@ -32,6 +32,8 @@ export async function ensureChannel(repoId, name, createdBy) {
  * @param {string} senderId                      - MongoDB id of the User posting the message
  * @param {string} text                          - message body (max 2000 chars)
  * @param {string} senderUsername                - display name to include in the payload
+ * @param {"user"|"meeting"} [type="user"]      - message category
+ * @param {object|null} [metadata=null]           - optional structured metadata
  */
 export async function postChannelMessage(
   io,
@@ -40,6 +42,8 @@ export async function postChannelMessage(
   senderId,
   text,
   senderUsername,
+  type = "user",
+  metadata = null,
 ) {
   // Make sure the channel row exists before we try to attach a message to it.
   const channel = await ensureChannel(repoId, channelName, senderId);
@@ -48,6 +52,8 @@ export async function postChannelMessage(
     channel: channel._id,
     sender: senderId,
     text: String(text).trim().slice(0, 2000),
+    type,
+    metadata,
   });
 
   // Emit using the same shape that the socket handler produces, so the
@@ -56,6 +62,8 @@ export async function postChannelMessage(
     _id: msg._id,
     channel: msg.channel,
     text: msg.text,
+    type: msg.type,
+    metadata: msg.metadata,
     createdAt: msg.createdAt,
     sender: {
       _id: senderId,
@@ -64,6 +72,32 @@ export async function postChannelMessage(
   };
 
   io.to(`channel:${channel._id}`).emit("channel:message", payload);
+
+  return msg;
+}
+
+export async function updateChannelMessageMetadata(io, messageId, metadata) {
+  const msg = await ChatMessage.findByIdAndUpdate(
+    messageId,
+    { $set: { metadata } },
+    { new: true },
+  )
+    .populate("sender", "username")
+    .populate("channel", "repo");
+
+  if (!msg) {
+    throw new Error("Chat message not found");
+  }
+
+  io.to(`channel:${msg.channel._id}`).emit("message-updated", {
+    _id: msg._id,
+    channel: msg.channel._id,
+    text: msg.text,
+    type: msg.type,
+    metadata: msg.metadata,
+    createdAt: msg.createdAt,
+    sender: msg.sender,
+  });
 
   return msg;
 }

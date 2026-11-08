@@ -24,3 +24,10 @@ export const deleteIssue = (issueId) =>
 export const grantCollaborator = (issueId) =>
   client.post(`/issues/${issueId}/grant-collaborator`);
 
+export const rejectCollaborationRequest = (issueId) =>
+  client.post(`/issues/${issueId}/reject`);
+
+export const getCollaborationRequests = (repoId, status) =>
+  client.get(`/repositories/${repoId}/collab-requests`, {
+    params: status ? { status } : undefined,
+  });

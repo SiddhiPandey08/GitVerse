@@ -23,6 +23,7 @@ import {
   updateIssue,
   deleteIssue,
   grantCollaborator,
+  rejectCollaborationRequest,
 } from "../../api/issues";
 import LoadingState from "../common/LoadingState";
 import EmptyState from "../common/EmptyState";
@@ -129,6 +130,23 @@ export default function RepoIssues({ repoId, isOwner = false, currentUserId }) {
     } catch (err) {
       setActionError(
         err.response?.data?.message || err.message || "Failed to grant collaborator access.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRejectCollaborator = async (issueId) => {
+    setBusyId(issueId);
+    setActionError("");
+    setActionNotice("");
+    try {
+      const res = await rejectCollaborationRequest(issueId);
+      setActionNotice(res.data?.message || "Collaboration request rejected.");
+      await loadIssues();
+    } catch (err) {
+      setActionError(
+        err.response?.data?.message || err.message || "Failed to reject collaboration request.",
       );
     } finally {
       setBusyId(null);
@@ -448,31 +466,49 @@ export default function RepoIssues({ repoId, isOwner = false, currentUserId }) {
               {/* Action Buttons */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
                 {/* Owner Grant Collaborator button */}
-                {isOwner && issue.requestCollaboration && issue.status === "open" && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    disabled={isBusy}
-                    onClick={() =>
-                      handleGrantCollaborator(issue._id, issue.author?.username || "user")
-                    }
-                    sx={{
-                      fontSize: "11px",
-                      py: 0.25,
-                      px: 1,
-                      textTransform: "none",
-                      color: "#3fb950",
-                      borderColor: "#238636",
-                      backgroundColor: "rgba(35, 134, 54, 0.1)",
-                      "&:hover": { backgroundColor: "rgba(35, 134, 54, 0.2)" },
-                    }}
-                  >
-                    Grant Collaborator
-                  </Button>
+                {isOwner && issue.requestCollaboration && issue.status === "pending" && (
+                  <>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={isBusy}
+                      onClick={() =>
+                        handleGrantCollaborator(issue._id, issue.author?.username || "user")
+                      }
+                      sx={{
+                        fontSize: "11px",
+                        py: 0.25,
+                        px: 1,
+                        textTransform: "none",
+                        color: "#3fb950",
+                        borderColor: "#238636",
+                        backgroundColor: "rgba(35, 134, 54, 0.1)",
+                        "&:hover": { backgroundColor: "rgba(35, 134, 54, 0.2)" },
+                      }}
+                    >
+                      Grant Collaborator
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={isBusy}
+                      onClick={() => handleRejectCollaborator(issue._id)}
+                      sx={{
+                        fontSize: "11px",
+                        py: 0.25,
+                        px: 1,
+                        textTransform: "none",
+                        color: "#f85149",
+                        borderColor: "#da3633",
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  </>
                 )}
 
                 {/* Status Toggle Button (Author or Owner) */}
-                {canManage && (
+                {canManage && !issue.requestCollaboration && (
                   <Button
                     size="small"
                     variant="outlined"
