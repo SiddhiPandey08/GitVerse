@@ -2,7 +2,7 @@
 // Talks to: api/repositories.js, RepoFiles.jsx, CommitHistory.jsx, RepoChat.jsx, RepoIssues.jsx, RepoCollaborators.jsx.
 
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { deleteRepository, toggleStar, toggleVisibility } from "../../api/repositories";
 import Navbar from "../navbar/Navbar";
 import CommitHistory from "./CommitHistory";
@@ -194,7 +194,13 @@ export default function RepositoryDetails() {
                 overflowWrap: "anywhere",
               }}
             >
-              {displayedRepo?.owner?.username || "Owner"} /{" "}
+              <Link
+                to={`/users/${displayedRepo?.owner?._id}`}
+                style={{ color: "inherit", textDecoration: "none" }}
+              >
+                {displayedRepo?.owner?.username || "Owner"}
+              </Link>{" "}
+              /{" "}
               <span style={{ fontWeight: 700 }}>
                 {displayedRepo?.name || "Repository"}
               </span>
