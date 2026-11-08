@@ -18,6 +18,15 @@ const ChatMessageSchema = new Schema(
       trim: true,
       maxlength: 2000,
     },
+    type: {
+      type: String,
+      enum: ["user", "meeting"],
+      default: "user",
+    },
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     replyTo: {
       type: Schema.Types.ObjectId,
       ref: "ChatMessage",

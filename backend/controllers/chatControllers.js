@@ -10,7 +10,7 @@ import { getRepoAccess } from "../utils/repoAccess.js";
 // GET /chat/repos/:repoId/channels
 // ---------------------------------------------------------------------------
 // Returns all channels for a repo, guaranteeing that "general" and
-// "collab-requests" always exist so the frontend never gets an empty list.
+// "collab-requests" and "meetings" always exist so the frontend never gets an empty list.
 export const listChannels = async (req, res) => {
   const access = await getRepoAccess(req.params.repoId, req.user);
   if (!access) return res.status(404).json({ message: "Repository not found" });
@@ -19,7 +19,7 @@ export const listChannels = async (req, res) => {
 
   // Upsert both default channels — $setOnInsert means we only write on creation,
   // so calling this endpoint repeatedly is safe and doesn't overwrite anything.
-  const defaultChannels = ["general", "collab-requests"];
+  const defaultChannels = ["general", "collab-requests", "meetings"];
   for (const name of defaultChannels) {
     await Channel.findOneAndUpdate(
       { repo: repo._id, name },

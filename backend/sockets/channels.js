@@ -36,7 +36,8 @@ function checkRateLimit(socketId) {
  * Events:
  *   channel:join    (channelId, ack)        – join a channel room if access is granted
  *   channel:leave   (channelId)             – leave a channel room
- *   channel:message (channelId, text, ack)  – persist and broadcast a message
+ *   channel:message (channelId, text, options, ack) – persist and broadcast a message
+ *   channel:message-update (channelId, messageId, metadata, ack) – update metadata
  *
  * @param {import("socket.io").Server} io
  */
@@ -70,8 +71,13 @@ const registerChannelSockets = (io) => {
     // ------------------------------------------------------------------
     // channel:message
     // ------------------------------------------------------------------
-    socket.on("channel:message", async (channelId, text, ack) => {
+    socket.on("channel:message", async (channelId, text, options, ack) => {
       try {
+        if (typeof options === "function") {
+          ack = options;
+          options = {};
+        }
+        options = options || {};
         // Must be authenticated.
         if (!socket.user) return ack({ ok: false, reason: "unauthenticated" });
 
@@ -92,12 +98,18 @@ const registerChannelSockets = (io) => {
         if (trimmed.length < 1 || trimmed.length > 2000) {
           return ack({ ok: false, reason: "invalid text length" });
         }
+        const type = options.type || "user";
+        if (!["user", "meeting"].includes(type)) {
+          return ack({ ok: false, reason: "invalid message type" });
+        }
 
         // Persist — sender is always taken from socket.user, never from the client payload.
         const msg = await ChatMessage.create({
           channel: channelId,
           sender: socket.user._id,
           text: trimmed,
+          type,
+          metadata: options.metadata ?? null,
         });
 
         // Broadcast to everyone in the room (including the sender).
@@ -105,6 +117,8 @@ const registerChannelSockets = (io) => {
           _id: msg._id,
           channel: msg.channel,
           text: msg.text,
+          type: msg.type,
+          metadata: msg.metadata,
           createdAt: msg.createdAt,
           sender: {
             _id: socket.user._id,
@@ -113,6 +127,35 @@ const registerChannelSockets = (io) => {
         };
 
         io.to(room).emit("channel:message", payload);
+        ack({ ok: true });
+      } catch {
+        ack({ ok: false, reason: "server error" });
+      }
+    });
+
+    socket.on("channel:message-update", async (channelId, messageId, metadata, ack) => {
+      try {
+        if (!socket.user) return ack({ ok: false, reason: "unauthenticated" });
+        const room = `channel:${channelId}`;
+        if (!socket.rooms.has(room)) {
+          return ack({ ok: false, reason: "not in channel" });
+        }
+        const message = await ChatMessage.findOneAndUpdate(
+          { _id: messageId, channel: channelId },
+          { $set: { metadata } },
+          { new: true },
+        ).populate("sender", "username");
+        if (!message) return ack({ ok: false, reason: "message not found" });
+
+        io.to(room).emit("message-updated", {
+          _id: message._id,
+          channel: message.channel,
+          text: message.text,
+          type: message.type,
+          metadata: message.metadata,
+          createdAt: message.createdAt,
+          sender: message.sender,
+        });
         ack({ ok: true });
       } catch {
         ack({ ok: false, reason: "server error" });
