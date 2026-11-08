@@ -25,6 +25,13 @@ import {
   getUploadUrls,
   getDownloadUrls,
 } from "../controllers/repoControllers.js";
+import { listCollaborationRequests } from "../controllers/issueControllers.js";
+import {
+  scheduleMeeting,
+  getUpcomingMeetings,
+  cancelMeeting,
+  startMeeting,
+} from "../controllers/meetingControllers.js";
 
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import {
@@ -120,6 +127,32 @@ repoRouter.delete(
   authMiddleware,
   authorizeRepoOwner,
   removeCollaborator,
+);
+repoRouter.get(
+  "/:repoId/collab-requests",
+  authMiddleware,
+  authorizeRepoOwner,
+  listCollaborationRequests,
+);
+repoRouter.post(
+  "/:repoId/meetings/schedule",
+  authMiddleware,
+  scheduleMeeting,
+);
+repoRouter.get(
+  "/:repoId/meetings/upcoming",
+  authMiddleware,
+  getUpcomingMeetings,
+);
+repoRouter.patch(
+  "/:repoId/meetings/:meetingId/cancel",
+  authMiddleware,
+  cancelMeeting,
+);
+repoRouter.post(
+  "/:repoId/meetings/start",
+  authMiddleware,
+  startMeeting,
 );
 
 export default repoRouter;

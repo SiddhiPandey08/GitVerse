@@ -10,14 +10,15 @@ let timeOnline = {};
 let mediaStatus = {}; // socketId -> { audio, video }
 
 // Decides whether a socket is allowed into a meeting room.
-// Repo rooms are named "repo-<repoId>" — for those, getRepoAccess is the
+// Repo rooms are named "repo-<repoId>" or "repo-<repoId>-<meetingId>" — for those, getRepoAccess is the
 // single source of truth (handles private repos and collaborator check).
 // Ad-hoc rooms (any other name) let any logged-in user in.
 const canJoin = async (roomId, user) => {
   if (!user) return false; // guests are never allowed
   const code = String(roomId).split("?")[0].split("/").pop();
-  if (!code.startsWith("repo-")) return true; // ad-hoc room: logged-in user only
-  const repoId = code.slice(5);
+  const match = code.match(/^repo-([a-f0-9]{24})(?:-([a-f0-9]{24}))?$/i);
+  if (!match) return true; // ad-hoc room: logged-in user only
+  const repoId = match[1];
   // getRepoAccess returns null when the user has no access (private repo, not a member).
   const access = await getRepoAccess(repoId, user);
   return access !== null;
